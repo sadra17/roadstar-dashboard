@@ -359,6 +359,101 @@ function EditModal({ booking, onClose, onSave }) {
   );
 }
 
+// ══ SMS MODAL ═════════════════════════════════════════════════════════════════
+function SMSModal({ booking, onClose, onSend }) {
+  const [msgType, setMsgType] = useState("confirmed");
+  const [sending, setSending] = useState(false);
+
+  const MSG_TYPES = [
+    { key: "confirmed", label: "Confirmed",  desc: `Appointment confirmed for ${booking.date} at ${booking.time}` },
+    { key: "reminder",  label: "Reminder",   desc: `Reminder for today at ${booking.time}` },
+    { key: "declined",  label: "Declined",   desc: `Appointment at ${booking.time} cancelled` },
+    { key: "waitlist",  label: "Waitlist",   desc: `A spot just opened up` },
+  ];
+
+  const handleSend = async () => {
+    setSending(true);
+    await onSend(booking, msgType);
+    setSending(false);
+  };
+
+  return (
+    <div onClick={e=>{if(e.target===e.currentTarget)onClose();}}
+      style={{ position:"fixed",inset:0,background:"rgba(2,5,12,0.82)",zIndex:1000,
+        display:"flex",alignItems:"center",justifyContent:"center",padding:20,backdropFilter:"blur(4px)" }}>
+      <div style={{ background:T.panelBg,border:`1px solid ${T.borderVis}`,borderRadius:T.r16,
+        padding:28,maxWidth:460,width:"100%",boxShadow:"0 8px 40px rgba(0,0,0,0.65)",position:"relative" }}>
+
+        {/* Close */}
+        <button onClick={onClose} style={{ position:"absolute",top:14,right:14,
+          background:T.elevated,border:`1px solid ${T.border}`,borderRadius:T.r8,
+          width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center",
+          color:T.textMuted,cursor:"pointer" }}>
+          <XIcon size={14}/>
+        </button>
+
+        {/* Header */}
+        <div style={{ display:"flex",alignItems:"center",gap:12,marginBottom:18 }}>
+          <div style={{ width:40,height:40,borderRadius:T.r8,background:T.blueMuted,
+            display:"flex",alignItems:"center",justifyContent:"center",color:T.blueBright }}>
+            <MsgIcon size={18}/>
+          </div>
+          <div>
+            <div style={{ fontSize:16,fontWeight:700,color:T.textPrimary }}>Send SMS via Twilio</div>
+            <div style={{ fontSize:12,color:T.textMuted }}>{booking.firstName} {booking.lastName} · {booking.phone}</div>
+          </div>
+        </div>
+
+        <div style={{ height:1,background:T.border,marginBottom:18 }}/>
+
+        {/* Message type selector */}
+        <div style={{ fontSize:11,fontWeight:600,letterSpacing:"0.07em",textTransform:"uppercase",
+          color:T.textMuted,marginBottom:10 }}>Message Type</div>
+
+        <div style={{ display:"flex",flexDirection:"column",gap:8,marginBottom:22 }}>
+          {MSG_TYPES.map(({ key, label, desc }) => {
+            const active = msgType === key;
+            return (
+              <button key={key} onClick={()=>setMsgType(key)} style={{
+                display:"flex",alignItems:"center",gap:12,
+                padding:"12px 14px",borderRadius:T.r10,cursor:"pointer",textAlign:"left",
+                background: active ? T.blueSubtle : T.elevated,
+                border:`1.5px solid ${active ? T.blue : T.border}`,
+                transition:"all 0.13s",
+              }}>
+                <div style={{ width:16,height:16,borderRadius:"50%",flexShrink:0,
+                  border:`2px solid ${active ? T.blue : T.textMuted}`,
+                  background: active ? T.blue : "transparent",
+                  display:"flex",alignItems:"center",justifyContent:"center" }}>
+                  {active && <div style={{ width:6,height:6,borderRadius:"50%",background:"#fff" }}/>}
+                </div>
+                <div>
+                  <div style={{ fontSize:13,fontWeight:600,color:active?T.textPrimary:T.textSecond }}>{label}</div>
+                  <div style={{ fontSize:11,color:T.textMuted,marginTop:1 }}>{desc}</div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Send button */}
+        <button onClick={handleSend} disabled={sending} style={{
+          width:"100%",padding:"12px",borderRadius:T.r8,
+          background:sending?T.blueMuted:T.blue,border:"none",
+          color:"#fff",fontSize:14,fontWeight:600,fontFamily:T.font,
+          cursor:sending?"not-allowed":"pointer",
+          display:"flex",alignItems:"center",justifyContent:"center",gap:8,
+          transition:"background 0.14s",
+        }}>
+          <MsgIcon size={15} color="#fff"/>
+          {sending ? "Sending..." : "Send SMS"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+
 // ══ APPOINTMENT CARD ══════════════════════════════════════════════════════════
 function AppointmentCard({ booking, onUpdate, onDelete, onEdit, onSMS }) {
   const [rescheduling, setRescheduling] = useState(false);
@@ -566,6 +661,7 @@ export default function RoadstarDashboard() {
   const [search,       setSearch]       = useState("");
   const [alerts,       setAlerts]       = useState([]);
   const [editBooking,  setEditBooking]  = useState(null);
+  const [smsBooking,   setSmsBooking]   = useState(null);
   const prevCountRef = useRef(0);
 
   // ── Push alert helper ─────────────────────────────────────────────────────
@@ -634,8 +730,17 @@ export default function RoadstarDashboard() {
   };
 
   const handleSMS = (booking) => {
-    // Placeholder — wire to Twilio backend route
-    alert(`[Twilio] Would send SMS to ${booking.phone} (${booking.firstName} ${booking.lastName})\nIntegrate your Twilio PATCH /api/bookings/:id/sms route here.`);
+    setSmsBooking(booking);
+  };
+
+  const handleSendSMS = async (booking, messageType) => {
+    try {
+      await sendSMS(booking._id, messageType);
+      pushAlert(`SMS sent to ${booking.firstName} ${booking.lastName} (${booking.phone})`);
+    } catch(e) {
+      pushAlert(e.message || "SMS failed. Check Twilio config on Render.", "error");
+    }
+    setSmsBooking(null);
   };
 
   // ── Filter + search ────────────────────────────────────────────────────────
@@ -679,6 +784,7 @@ export default function RoadstarDashboard() {
 
       <AlertToast alerts={alerts} onDismiss={dismissAlert}/>
       {editBooking && <EditModal booking={editBooking} onClose={()=>setEditBooking(null)} onSave={handleSaveEdit}/>}
+      {smsBooking  && <SMSModal  booking={smsBooking}  onClose={()=>setSmsBooking(null)}  onSend={handleSendSMS}/>}
 
       {/* HEADER */}
       <header style={{ background:T.pageBg, borderBottom:`1px solid ${T.border}`,
