@@ -237,7 +237,7 @@ function AlertToast({ alerts, onDismiss }) {
       {alerts.map(a => (
         <div key={a.id} style={{
           background:T.panelBg, border:`1px solid ${T.borderVis}`,
-          borderLeft:`3px solid ${a.type==="error"?T.red:T.blue}`,
+          borderLeft:`3px solid ${a.type==="error"?T.red:a.type==="new"?T.green:T.blue}`,
           borderRadius:T.r10, padding:"13px 14px",
           display:"flex", alignItems:"flex-start", gap:11,
           boxShadow:"0 4px 20px rgba(0,0,0,0.55)", animation:"toastIn 0.22s ease",
@@ -251,7 +251,7 @@ function AlertToast({ alerts, onDismiss }) {
           <div style={{ flex:1, minWidth:0 }}>
             <div style={{ fontSize:10, fontWeight:700, letterSpacing:"0.07em",
               textTransform:"uppercase", marginBottom:3,
-              color:a.type==="error"?T.red:T.blueBright }}>
+              color:a.type==="error"?T.red:a.type==="new"?T.green:T.blueBright }}>
               {a.type==="error" ? "Error" : "Update"}
             </div>
             <div style={{ fontSize:13, color:T.textSecond, lineHeight:1.5 }}>{a.message}</div>
@@ -479,7 +479,8 @@ function AppointmentCard({ booking, onUpdate, onDelete, onEdit, onSMS }) {
 
   const handleReschedule = async () => {
     if (!newTime || newTime === "Select a slot...") return;
-    await act({ time: newTime });
+    // Update time and trigger a reminder SMS so customer knows their slot changed
+    await act({ time: newTime, sendSMS: true });
     setRescheduling(false); setNewTime("");
   };
 
@@ -611,12 +612,19 @@ function Skeleton() {
 }
 
 // ══ LOGO + LIVE PULSE ════════════════════════════════════════════════════════
+// ── LOGO — replace LOGO_URL with your image URL, or keep the default tire icon
+const LOGO_URL = "https://cdn.shopify.com/s/files/1/0753/4261/0659/files/road-star-logo_-_White.png?v=1756484226";  // e.g. "https://cdn.shopify.com/s/files/.../logo.png"
+
 function Logo() {
   return (
     <div style={{ display:"flex", alignItems:"center", gap:12 }}>
       <div style={{ width:40, height:40, borderRadius:"50%", background:T.cardBg,
-        border:`1.5px solid ${T.borderVis}`, display:"flex", alignItems:"center", justifyContent:"center" }}>
-        <TireIcon size={22} color={T.blue}/>
+        border:`1.5px solid ${T.borderVis}`, display:"flex", alignItems:"center", justifyContent:"center",
+        overflow:"hidden" }}>
+        {LOGO_URL
+          ? <img src={LOGO_URL} alt="Logo" style={{ width:"100%", height:"100%", objectFit:"cover" }}/>
+          : <TireIcon size={22} color={T.blue}/>
+        }
       </div>
       <div>
         <div style={{ fontSize:15, fontWeight:800, letterSpacing:"0.07em",
@@ -687,10 +695,11 @@ export default function RoadstarDashboard() {
     if (!silent) setLoading(true);
     try {
       const data = await fetchBookings();
-      // Alert on new booking (polling)
+      // Alert + sound on new booking (polling)
       if (silent && data.length > prevCountRef.current) {
         const newest = data[data.length - 1];
-        pushAlert(`New booking: ${newest.firstName} ${newest.lastName} — ${newest.service} at ${newest.time}`);
+        pushAlert(`New booking: ${newest.firstName} ${newest.lastName} — ${newest.service} at ${newest.time}`, "new");
+        playSound();
       }
       prevCountRef.current = data.length;
       setBookings(data);
@@ -703,10 +712,31 @@ export default function RoadstarDashboard() {
     }
   }, [pushAlert]);
 
-  // Initial load + polling every 30s
+  // ── Notification sound (Web Audio API — no files needed) ────────────────────
+  const playSound = useCallback(() => {
+    try {
+      const ac  = new (window.AudioContext || window.webkitAudioContext)();
+      const now = ac.currentTime;
+      const playTone = (freq, start, dur) => {
+        const osc = ac.createOscillator();
+        const gain = ac.createGain();
+        osc.connect(gain); gain.connect(ac.destination);
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freq, start);
+        gain.gain.setValueAtTime(0, start);
+        gain.gain.linearRampToValueAtTime(0.4, start + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, start + dur);
+        osc.start(start); osc.stop(start + dur);
+      };
+      playTone(800,  now,        0.35);
+      playTone(1050, now + 0.22, 0.45);
+    } catch(e) { console.warn("[Sound]", e.message); }
+  }, []);
+
+  // Initial load + polling every 15s
   useEffect(() => {
     loadBookings();
-    const interval = setInterval(() => loadBookings(true), 30_000);
+    const interval = setInterval(() => loadBookings(true), 15_000);
     return () => clearInterval(interval);
   }, [loadBookings]);
 
