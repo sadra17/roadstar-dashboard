@@ -118,7 +118,30 @@ const fmtDate  = d => {
 };
 const displaySvc = b => b.service === "Other" && b.customService
   ? `Other — ${b.customService}` : b.service;
-const effectiveOcc = b => (b.service_duration||10) + (b.equipment_recovery_time||0);
+
+// SERVICE_DEFS mirror (kept in sync with server/config/business.js)
+const SVC_DEFS = {
+  "Tire Change + Installation": { service_duration: 40, equipment_recovery_time: 0 },
+  "Flat Tire Repair":           { service_duration: 15, equipment_recovery_time: 0 },
+  "Tire Rotation":              { service_duration: 20, equipment_recovery_time: 0 },
+  "Wheel Alignment":            { service_duration: 60, equipment_recovery_time: 0 },
+  "Tire Purchase":              { service_duration: 10, equipment_recovery_time: 0 },
+  "Other":                      { service_duration: 30, equipment_recovery_time: 0 },
+};
+
+// Resolve effective occupation — uses DB value if it was saved correctly (> 10 or is Tire Purchase),
+// otherwise falls back to the service definition. This handles old bookings that were saved
+// before service_duration was denormalized into the schema.
+const effectiveOcc = b => {
+  const def = SVC_DEFS[b.service];
+  const storedDur = b.service_duration;
+  // If stored duration is the schema default (10) but service isn't Tire Purchase, use the def
+  const dur = (storedDur && (storedDur !== 10 || b.service === "Tire Purchase"))
+    ? storedDur
+    : (def?.service_duration || 10);
+  const rec = b.equipment_recovery_time || def?.equipment_recovery_time || 0;
+  return dur + rec;
+};
 
 // ── Primitives ────────────────────────────────────────────────────────────────
 function Badge({ status }) {
