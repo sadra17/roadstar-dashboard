@@ -857,7 +857,7 @@ function ApptCard({ booking, onUpdate, onDelete, onEdit, onSMS, onNote, onComple
           {!isCompleted&&booking.status!=="confirmed"&&booking.status!=="completed"&&(
             <IBtn onClick={()=>act({status:"confirmed"})} title="Confirm (sends SMS)" v="accept" disabled={busy}><CheckIcon size={17}/></IBtn>
           )}
-          {!isCompleted&&(booking.status==="confirmed"||booking.status==="pending")&&(
+          {!isCompleted&&booking.status!=="completed"&&booking.status!=="cancelled"&&(
             <IBtn onClick={()=>onComplete(booking)} title="Mark as Completed" v="complete" disabled={busy}><FlagIcon size={17}/></IBtn>
           )}
           {!isCompleted&&booking.status!=="cancelled"&&booking.status!=="completed"&&(
@@ -1133,7 +1133,7 @@ export default function RoadstarDashboard({ onLogout }) {
         select option{background:${T.panelBg}}::placeholder{color:${T.textMuted}}button{font-family:${T.font}}
         input[type=date]{color-scheme:dark}
 
-        /* iPhone-only hamburger (phones < 640px; iPads 768px+ keep full toolbar) */
+        /* iPhone-only hamburger + drawer (phones < 640px; iPads 768px+ keep full toolbar) */
         .toolbar-desktop{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
         .hamburger-btn{display:none}
         @media(max-width:639px){
@@ -1142,27 +1142,78 @@ export default function RoadstarDashboard({ onLogout }) {
             width:40px;height:40px;background:${T.elevated};border:1px solid ${T.border};
             border-radius:${T.r8};cursor:pointer;color:${T.textSecond}}
         }
+        /* Smooth drawer transition including Safari */
+        @keyframes drawerIn{from{transform:translateX(-100%)}to{transform:translateX(0)}}
       `}</style>
 
       <Toast alerts={alerts} onDismiss={dismissAlert}/>
 
-      {/* Mobile menu overlay */}
-      {mobileMenu&&<div onClick={()=>setMobileMenu(false)} style={{position:"fixed",inset:0,background:"rgba(2,4,12,.7)",zIndex:500,backdropFilter:"blur(4px)"}}/>}
+      {/* Mobile drawer overlay */}
       {mobileMenu&&(
-        <div style={{position:"fixed",top:57,right:12,zIndex:600,background:T.panelBg,border:`1px solid ${T.borderVis}`,borderRadius:T.r12,padding:"10px 6px",boxShadow:T.shadowLg,minWidth:180}}>
+        <div onClick={()=>setMobileMenu(false)}
+          style={{position:"fixed",inset:0,background:"rgba(2,4,12,.75)",zIndex:500,backdropFilter:"blur(6px)"}}/>
+      )}
+      {/* Mobile drawer — slides in from left, full height */}
+      <div style={{
+        position:"fixed",top:0,left:0,bottom:0,zIndex:600,width:280,
+        background:T.panelBg,borderRight:`1px solid ${T.borderVis}`,
+        boxShadow:"4px 0 40px rgba(0,0,0,.7)",
+        transform:mobileMenu?"translateX(0)":"translateX(-100%)",
+        transition:"transform .25s cubic-bezier(.4,0,.2,1)",
+        display:"flex",flexDirection:"column",
+      }}>
+        {/* Drawer header */}
+        <div style={{padding:"16px 18px",borderBottom:`1px solid ${T.border}`,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <div style={{width:30,height:30,borderRadius:"50%",background:T.cardBg,border:`1px solid ${T.borderVis}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <TireIcon size={16} color={T.blue}/>
+            </div>
+            <span style={{fontSize:13,fontWeight:700,color:T.textPrimary,letterSpacing:"0.05em",textTransform:"uppercase"}}>Roadstar Tire</span>
+          </div>
+          <button onClick={()=>setMobileMenu(false)}
+            style={{background:T.elevated,border:`1px solid ${T.border}`,borderRadius:T.r8,
+              width:28,height:28,display:"flex",alignItems:"center",justifyContent:"center",
+              color:T.textMuted,cursor:"pointer"}}>
+            <XIcon size={13}/>
+          </button>
+        </div>
+        {/* Live indicator in drawer */}
+        <div style={{padding:"10px 18px",borderBottom:`1px solid ${T.border}`,display:"flex",alignItems:"center",gap:7}}>
+          <div style={{position:"relative",width:8,height:8}}>
+            <div style={{position:"absolute",inset:0,borderRadius:"50%",background:connected?T.green:T.amber,animation:"livePulse 2.2s infinite"}}/>
+            <div style={{position:"absolute",inset:0,borderRadius:"50%",background:connected?T.green:T.amber}}/>
+          </div>
+          <span style={{fontSize:11,fontWeight:600,color:connected?T.green:T.amber,letterSpacing:"0.06em"}}>{connected?"API LIVE":"OFFLINE"}</span>
+        </div>
+        {/* Drawer nav items */}
+        <div style={{flex:1,overflowY:"auto",padding:"8px 8px"}}>
           {toolbarItems.map(item=>(
             <button key={item.label} onClick={item.onClick}
-              style={{display:"flex",alignItems:"center",gap:10,width:"100%",padding:"11px 14px",
-                background:"none",border:"none",borderRadius:T.r8,cursor:"pointer",
-                color:item.danger?T.red:T.textSecond,fontSize:14,fontWeight:500,
-                fontFamily:T.font,textAlign:"left",transition:"background .12s"}}
+              style={{display:"flex",alignItems:"center",gap:12,width:"100%",
+                padding:"13px 14px",background:"none",border:"none",
+                borderRadius:T.r10,cursor:"pointer",
+                color:item.danger?T.red:T.textPrimary,fontSize:15,fontWeight:500,
+                fontFamily:T.font,textAlign:"left",transition:"background .12s",marginBottom:2}}
               onMouseEnter={e=>e.currentTarget.style.background=T.elevated}
               onMouseLeave={e=>e.currentTarget.style.background="none"}>
-              {item.icon}{item.label}
+              <div style={{width:36,height:36,borderRadius:T.r10,flexShrink:0,
+                background:item.danger?T.redBg:T.elevated,
+                border:`1px solid ${item.danger?T.redBorder:T.border}`,
+                display:"flex",alignItems:"center",justifyContent:"center"}}>
+                {item.icon}
+              </div>
+              {item.label}
             </button>
           ))}
         </div>
-      )}
+        {/* Drawer footer */}
+        <div style={{padding:"14px 18px",borderTop:`1px solid ${T.border}`,textAlign:"center"}}>
+          <span style={{fontSize:11,color:T.textMuted}}>Built by{" "}
+            <a href="https://socialaura.ca" target="_blank" rel="noopener noreferrer"
+              style={{color:T.textSecond,textDecoration:"none",fontWeight:600}}>Social Aura</a>
+          </span>
+        </div>
+      </div>
 
       {/* Modals */}
       {editB       &&<EditModal     booking={editB}    onClose={()=>setEditB(null)}    onSave={handleSaveEdit}/>}
@@ -1293,6 +1344,21 @@ export default function RoadstarDashboard({ onLogout }) {
         </div>
 
       </main>
+
+      {/* FOOTER */}
+      <footer style={{borderTop:`1px solid ${T.border}`,padding:"16px 24px",
+        display:"flex",alignItems:"center",justifyContent:"center",
+        background:T.pageBg,marginTop:"auto"}}>
+        <span style={{fontSize:12,color:T.textMuted,letterSpacing:"0.04em"}}>
+          Built by{" "}
+          <a href="https://socialaura.ca" target="_blank" rel="noopener noreferrer"
+            style={{color:T.textSecond,textDecoration:"none",fontWeight:600}}
+            onMouseEnter={e=>e.target.style.color=T.blueBright}
+            onMouseLeave={e=>e.target.style.color=T.textSecond}>
+            Social Aura
+          </a>
+        </span>
+      </footer>
     </>
   );
 }
