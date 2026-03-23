@@ -133,13 +133,15 @@ const SVC_DEFS = {
 // otherwise falls back to the service definition. This handles old bookings that were saved
 // before service_duration was denormalized into the schema.
 const effectiveOcc = b => {
+  // _resolvedDuration is set by the live-bay endpoint using server-side resolvedOccupation()
+  if (b._resolvedDuration) return b._resolvedDuration;
   const def = SVC_DEFS[b.service];
   const storedDur = b.service_duration;
-  // If stored duration is the schema default (10) but service isn't Tire Purchase, use the def
-  const dur = (storedDur && (storedDur !== 10 || b.service === "Tire Purchase"))
+  // Use stored only if > 10 (correctly saved). Otherwise use config truth.
+  const dur = (storedDur && storedDur > 10)
     ? storedDur
     : (def?.service_duration || 10);
-  const rec = b.equipment_recovery_time || def?.equipment_recovery_time || 0;
+  const rec = b.equipment_recovery_time !== undefined ? b.equipment_recovery_time : (def?.equipment_recovery_time || 0);
   return dur + rec;
 };
 
@@ -698,7 +700,7 @@ function LiveAtBay({ onSnooze, onComplete }) {
     }catch(e){}finally{setLoading(false);}
   },[]);
 
-  useEffect(()=>{ fetchBay(); const iv=setInterval(fetchBay,60_000); return()=>clearInterval(iv); },[fetchBay]);
+  useEffect(()=>{ fetchBay(); const iv=setInterval(fetchBay,30_000); return()=>clearInterval(iv); },[fetchBay]);
 
   if(loading) return null;
 
@@ -754,8 +756,10 @@ function LiveAtBay({ onSnooze, onComplete }) {
                 </div>
                 {(isOver||needsChk)&&(
                   <div style={{background:T.redBg,border:`1px solid ${T.redBorder}`,borderRadius:T.r8,
-                    padding:"7px 10px",marginBottom:10,fontSize:12,color:T.redText}}>
-                    Is {b.firstName} done?
+                    padding:"9px 12px",marginBottom:10,fontSize:13,fontWeight:600,color:T.redText,
+                    display:"flex",alignItems:"center",gap:8}}>
+                    <span style={{fontSize:16}}>⏰</span>
+                    Is this done? — {b.firstName} {b.lastName}
                   </div>
                 )}
                 <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
