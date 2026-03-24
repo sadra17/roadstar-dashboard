@@ -42,6 +42,6 @@ export const login = async (email, password) => {
   localStorage.setItem("roadstar_token", d.token); return d;
 };
 export const verifyToken = async () => {
-  const res = await fetch(`${BASE}/auth/verify`, { headers:h() });
+  const res = await fetch(`${BASE}/auth/verify`, { method:"POST", headers:h() });
   const d = await res.json(); return d.success===true;
 };

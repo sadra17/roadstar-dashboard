@@ -1072,7 +1072,6 @@ export default function RoadstarDashboard({ onLogout }) {
   const [showCustomers, setShowCustomers]= useState(false);
   const [showHeatmap,   setShowHeatmap]  = useState(false);
   const [smsLogB,       setSmsLogB]      = useState(null);
-  const [showSettings,  setShowSettings] = useState(false);
 
   const prevCount   = useRef(0);
   const audioCtxRef = useRef(null);
@@ -1186,7 +1185,7 @@ export default function RoadstarDashboard({ onLogout }) {
     {label:"Heatmap",    icon:<BarIcon    size={13} color={T.textSecond}/>,onClick:()=>{setShowHeatmap(true);setMobileMenu(false);}},
     {label:"Print Today",icon:<PrintIcon  size={13} color={T.textSecond}/>,onClick:()=>{printDay(bookings,today);setMobileMenu(false);}},
     {label:"Refresh",    icon:<RefreshIcon size={13} color={T.textSecond}/>,onClick:()=>{load();setMobileMenu(false);}},
-    {label:"Settings",   icon:<SettingsIcon size={13} color={T.textSecond}/>, onClick:()=>{setShowSettings(true);setMobileMenu(false);}},
+    {label:"Settings",   icon:<SettingsIcon size={13} color={T.textSecond}/>, onClick:()=>{setTab("settings");setMobileMenu(false);}},
     {label:"Sign Out",   icon:<LogOutIcon size={13} color={T.red}/>,     onClick:onLogout, danger:true},
   ];
 
