@@ -16,6 +16,7 @@ import {
   fetchBookings, updateBooking, deleteBooking, sendSMS,
   fetchRecentlyDeleted, restoreBooking, getToken,
 } from "./api.js";
+import SettingsPage from "./SettingsPage.jsx";
 
 const API_BASE = (import.meta.env.VITE_API_URL || "https://roadstar-api.onrender.com/api");
 
@@ -137,7 +138,9 @@ const NoteIcon    = p=><Ic {...p}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 
 const WalkInIcon  = p=><Ic {...p}><circle cx="12" cy="5" r="2"/><path d="m15 14-3-6-3 6"/><path d="M9 11H7l-2 6"/><path d="m17 11 2 6"/></Ic>;
 const StarIcon    = p=><Ic {...p}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></Ic>;
 const MenuIcon    = p=><Ic {...p}><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></Ic>;
-const BayIcon     = p=><Ic {...p}><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></Ic>;
+const BayIcon      = p=><Ic {...p}><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></Ic>;
+const SettingsIcon = p=><Ic {...p}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></Ic>;
+const MsgLogIcon   = p=><Ic {...p}><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><line x1="9" y1="10" x2="15" y2="10"/><line x1="9" y1="14" x2="13" y2="14"/></Ic>;
 const RestoreIcon = p=><Ic {...p}><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></Ic>;
 const BellIcon    = p=><Ic {...p}><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></Ic>;
 
@@ -747,7 +750,7 @@ function LiveAtBay({ onSnooze, onComplete }) {
 }
 
 // ── Appointment Card ──────────────────────────────────────────────────────────
-function ApptCard({ booking, onUpdate, onDelete, onEdit, onSMS, onNote, onComplete, visitCount, isCompleted=false }) {
+function ApptCard({ booking, onUpdate, onDelete, onEdit, onSMS, onSmsLog, onNote, onComplete, visitCount, isCompleted=false }) {
   const [reschedule,setReschedule] = useState(false);
   const [newTime,setNewTime]       = useState("");
   const [hov,setHov]               = useState(false);
@@ -813,6 +816,7 @@ function ApptCard({ booking, onUpdate, onDelete, onEdit, onSMS, onNote, onComple
           <div style={{width:1,height:24,background:T.border,margin:"0 2px"}}/>
           {!isCompleted&&<IBtn onClick={()=>setReschedule(r=>!r)} title="Reschedule" v="reschedule" disabled={busy}><CalClkIcon size={15}/></IBtn>}
           <IBtn onClick={()=>onSMS(booking)} title="Send SMS" v="sms" disabled={busy}><MsgIcon size={15}/></IBtn>
+          <IBtn onClick={()=>onSmsLog(booking)} title="SMS history" v="def" disabled={busy}><MsgLogIcon size={15}/></IBtn>
           <IBtn onClick={()=>onNote(booking)} title="Add/edit note" v="note" disabled={busy}><NoteIcon size={15}/></IBtn>
           <IBtn onClick={()=>onEdit(booking)} title="Edit" v="edit" disabled={busy}><PenIcon size={15}/></IBtn>
           <IBtn onClick={()=>onDelete(booking)} title="Delete" v="trash" disabled={busy}><TrashIcon size={15}/></IBtn>
@@ -834,7 +838,7 @@ function ApptCard({ booking, onUpdate, onDelete, onEdit, onSMS, onNote, onComple
 }
 
 // ── Date Group ────────────────────────────────────────────────────────────────
-function DateGroup({ date, bookings, onUpdate, onDelete, onEdit, onSMS, onNote, onComplete, allBookings, onPrint }) {
+function DateGroup({ date, bookings, onUpdate, onDelete, onEdit, onSMS, onSmsLog, onNote, onComplete, allBookings, onPrint }) {
   const phoneCount = {};
   allBookings.forEach(b=>{phoneCount[b.phone]=(phoneCount[b.phone]||0)+1;});
   return (
@@ -855,7 +859,7 @@ function DateGroup({ date, bookings, onUpdate, onDelete, onEdit, onSMS, onNote, 
       <div style={{display:"flex",flexDirection:"column",gap:9}}>
         {bookings.map(b=>(
           <ApptCard key={b._id} booking={b} onUpdate={onUpdate} onDelete={onDelete} onEdit={onEdit}
-            onSMS={onSMS} onNote={onNote} onComplete={onComplete} visitCount={phoneCount[b.phone]||1}/>
+            onSMS={onSMS} onSmsLog={onSmsLog} onNote={onNote} onComplete={onComplete} visitCount={phoneCount[b.phone]||1}/>
         ))}
       </div>
     </div>
@@ -1006,6 +1010,46 @@ function Logo() {
   );
 }
 
+// ── SMS Log Modal ────────────────────────────────────────────────────────────
+function SmsLogModal({ booking, onClose }) {
+  const logs = booking?.smsLog || [];
+  const fmtTime = dt => dt ? new Date(dt).toLocaleString("en-CA",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}) : "—";
+  const typeLabel = { confirmed:"Confirmed", declined:"Declined", waitlist:"Waitlist", reminder:"Reminder",
+    completed_review:"Complete + Review", completed_no_review:"Complete", no_show:"No-show" };
+  return (
+    <Overlay onClose={onClose} wide>
+      <MHdr icon={<MsgLogIcon size={18}/>} title="SMS History"
+        sub={`${booking.firstName} ${booking.lastName} · ${booking.phone}`}/>
+      <HDivider/>
+      {logs.length === 0 ? (
+        <div style={{textAlign:"center",padding:"24px 0",color:T.textMuted,fontSize:13}}>No SMS messages sent for this booking yet.</div>
+      ) : (
+        <div style={{display:"flex",flexDirection:"column",gap:8,maxHeight:480,overflowY:"auto"}}>
+          {[...logs].reverse().map((l,i) => (
+            <div key={i} style={{background:T.elevated,border:`1px solid ${l.status==="failed"?T.redBorder:l.status==="sent"?T.greenBorder:T.border}`,borderRadius:T.r10,padding:"12px 14px"}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6,gap:8,flexWrap:"wrap"}}>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <span style={{fontSize:12,fontWeight:700,color:l.status==="sent"?T.green:l.status==="failed"?T.red:T.textMuted,
+                    background:l.status==="sent"?T.greenBg:l.status==="failed"?T.redBg:T.elevated,
+                    border:`1px solid ${l.status==="sent"?T.greenBorder:l.status==="failed"?T.redBorder:T.border}`,
+                    padding:"2px 8px",borderRadius:20,textTransform:"uppercase",letterSpacing:"0.05em"}}>
+                    {l.status||"—"}
+                  </span>
+                  <span style={{fontSize:12,fontWeight:600,color:T.textPrimary}}>{typeLabel[l.messageType]||l.messageType}</span>
+                </div>
+                <span style={{fontSize:11,color:T.textMuted}}>{fmtTime(l.sentAt)}</span>
+              </div>
+              {l.body && <div style={{fontSize:12,color:T.textSecond,lineHeight:1.65,whiteSpace:"pre-wrap",background:T.cardBg,padding:"8px 10px",borderRadius:T.r8}}>{l.body}</div>}
+              {l.error && <div style={{fontSize:11,color:T.redText,marginTop:4}}>Error: {l.error}</div>}
+              {l.twilioSid && <div style={{fontSize:10,color:T.textMuted,marginTop:4,fontFamily:"monospace"}}>SID: {l.twilioSid}</div>}
+            </div>
+          ))}
+        </div>
+      )}
+    </Overlay>
+  );
+}
+
 // ═════════════════════════════════════════════════════════════════════════════
 // ROOT DASHBOARD
 // ═════════════════════════════════════════════════════════════════════════════
@@ -1027,6 +1071,8 @@ export default function RoadstarDashboard({ onLogout }) {
   const [showWalkIn,    setShowWalkIn]   = useState(false);
   const [showCustomers, setShowCustomers]= useState(false);
   const [showHeatmap,   setShowHeatmap]  = useState(false);
+  const [smsLogB,       setSmsLogB]      = useState(null);
+  const [showSettings,  setShowSettings] = useState(false);
 
   const prevCount   = useRef(0);
   const audioCtxRef = useRef(null);
@@ -1140,6 +1186,7 @@ export default function RoadstarDashboard({ onLogout }) {
     {label:"Heatmap",    icon:<BarIcon    size={13} color={T.textSecond}/>,onClick:()=>{setShowHeatmap(true);setMobileMenu(false);}},
     {label:"Print Today",icon:<PrintIcon  size={13} color={T.textSecond}/>,onClick:()=>{printDay(bookings,today);setMobileMenu(false);}},
     {label:"Refresh",    icon:<RefreshIcon size={13} color={T.textSecond}/>,onClick:()=>{load();setMobileMenu(false);}},
+    {label:"Settings",   icon:<SettingsIcon size={13} color={T.textSecond}/>, onClick:()=>{setShowSettings(true);setMobileMenu(false);}},
     {label:"Sign Out",   icon:<LogOutIcon size={13} color={T.red}/>,     onClick:onLogout, danger:true},
   ];
 
@@ -1217,6 +1264,7 @@ export default function RoadstarDashboard({ onLogout }) {
       {showWalkIn   &&<WalkInModal   onClose={()=>setShowWalkIn(false)}   onSave={()=>load()} bookings={bookings}/>}
       {showCustomers&&<CustomerModal onClose={()=>setShowCustomers(false)}/>}
       {showHeatmap  &&<HeatmapModal  bookings={bookings} onClose={()=>setShowHeatmap(false)}/>}
+      {smsLogB      &&<SmsLogModal   booking={smsLogB}   onClose={()=>setSmsLogB(null)}/>}
 
       {/* HEADER */}
       <header style={{background:T.pageBg,borderBottom:`1px solid ${T.border}`,padding:"10px 18px",
@@ -1262,7 +1310,8 @@ export default function RoadstarDashboard({ onLogout }) {
             {[
               {id:"queue",    label:"Live Queue",       icon:<CalIcon     size={13}/>},
               {id:"completed",label:"Completed",        icon:<FlagIcon    size={13}/>},
-              {id:"deleted",  label:"Recently Deleted", icon:<TrashIcon   size={13}/>},
+              {id:"deleted",  label:"Recently Deleted", icon:<TrashIcon    size={13}/>},
+              {id:"settings", label:"Settings",          icon:<SettingsIcon size={13}/>},
             ].map(t=>{
               const active=tab===t.id;
               return (
@@ -1307,7 +1356,7 @@ export default function RoadstarDashboard({ onLogout }) {
             : Object.entries(byDate).map(([date,bkgs])=>(
                 <DateGroup key={date} date={date} bookings={bkgs}
                   onUpdate={handleUpdate} onDelete={setDeleteB} onEdit={setEditB}
-                  onSMS={setSmsB} onNote={setNoteB} onComplete={setCompleteB}
+                  onSMS={setSmsB} onSmsLog={setSmsLogB} onNote={setNoteB} onComplete={setCompleteB}
                   allBookings={bookings} onPrint={d=>printDay(bookings,d)}/>
               ))
         )}
@@ -1327,7 +1376,7 @@ export default function RoadstarDashboard({ onLogout }) {
                   {[...completedBookings].sort((a,b)=>`${b.date} ${b.time}`.localeCompare(`${a.date} ${a.time}`))
                     .map(b=>(
                       <ApptCard key={b._id} booking={b} onUpdate={handleUpdate} onDelete={setDeleteB}
-                        onEdit={setEditB} onSMS={setSmsB} onNote={setNoteB} onComplete={setCompleteB}
+                        onEdit={setEditB} onSMS={setSmsB} onSmsLog={setSmsLogB} onNote={setNoteB} onComplete={setCompleteB}
                         visitCount={bookings.filter(x=>x.phone===b.phone).length} isCompleted/>
                     ))}
                 </div>
@@ -1340,8 +1389,13 @@ export default function RoadstarDashboard({ onLogout }) {
           <RecentlyDeleted onRestore={()=>{load();pushAlert("Booking restored to the live queue.");}}/>
         )}
 
+        {/* SETTINGS TAB */}
+        {tab==="settings"&&(
+          <SettingsPage onAlert={(msg,type)=>pushAlert(msg,type||"info")}/>
+        )}
+
         {/* LIVE AT BAY */}
-        {tab!=="deleted"&&(
+        {tab!=="deleted"&&tab!=="settings"&&(
           <div style={{marginTop:32,paddingTop:24,borderTop:`1px solid ${T.border}`}}>
             <LiveAtBay onSnooze={handleBaySnooze} onComplete={(b)=>setCompleteB(b)}/>
           </div>
