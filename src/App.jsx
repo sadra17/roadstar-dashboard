@@ -1,55 +1,38 @@
+// App.jsx  v9
 import { useState, useEffect } from "react";
 import RoadstarDashboard from "./RoadstarDashboard.jsx";
 import LoginPage from "./LoginPage.jsx";
 import { verifyToken, getToken } from "./api.js";
+import { getTheme, DARK, LIGHT } from "./theme.js";
 
 export default function App() {
-  // null = still checking, false = not logged in, true = logged in
-  const [authed, setAuthed] = useState(null);
+  const [authed, setAuthed] = useState(null); // null=checking, false=login, true=dashboard
 
   useEffect(() => {
-    // On every mount/reload: check if there's a valid token in localStorage
+    // Apply saved theme immediately on load
+    const T = getTheme() === "dark" ? DARK : LIGHT;
+    document.body.style.background = T.pageBg;
+    document.body.style.margin     = "0";
+
     const token = getToken();
-    if (!token) {
-      setAuthed(false);
-      return;
-    }
-    // Verify the token is still valid with the server
-    verifyToken()
-      .then(valid => setAuthed(valid))
-      .catch(() => setAuthed(false));
+    if (!token) { setAuthed(false); return; }
+    verifyToken().then(v => setAuthed(v)).catch(() => setAuthed(false));
   }, []);
 
   const handleLogin  = () => setAuthed(true);
-  const handleLogout = () => {
-    localStorage.removeItem("roadstar_token");
-    setAuthed(false);
-  };
+  const handleLogout = () => { localStorage.removeItem("roadstar_token"); setAuthed(false); };
 
-  // Still checking token — show blank dark screen, not a flash of login
+  // Checking — spinner
   if (authed === null) {
+    const T = getTheme() === "dark" ? DARK : LIGHT;
     return (
-      <div style={{
-        minHeight: "100vh",
-        background: "#07090f",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}>
-        <div style={{
-          width: 28, height: 28, borderRadius: "50%",
-          border: "2px solid #1d2b40",
-          borderTopColor: "#2563EB",
-          animation: "spin 0.8s linear infinite",
-        }}/>
+      <div style={{ minHeight:"100vh", background:T.pageBg, display:"flex", alignItems:"center", justifyContent:"center" }}>
+        <div style={{ width:28, height:28, borderRadius:"50%", border:`2px solid ${T.border}`, borderTopColor:T.blue, animation:"spin .8s linear infinite" }}/>
         <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       </div>
     );
   }
 
-  if (!authed) {
-    return <LoginPage onLogin={handleLogin} />;
-  }
-
-  return <RoadstarDashboard onLogout={handleLogout} />;
+  if (!authed) return <LoginPage onLogin={handleLogin}/>;
+  return <RoadstarDashboard onLogout={handleLogout}/>;
 }
