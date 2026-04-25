@@ -189,7 +189,7 @@ export default function BookingsPage({ onAlert }) {
           }}/>
       )}
 
-      {/* SMS modal */
+      {/* SMS modal */}
       {smsB && (
         <SMSModal booking={smsB} onClose={() => setSmsB(null)}
           onSend={async (b, t) => { try { await sendSMS(b.id, t); onAlert?.("SMS sent"); } catch (e) { onAlert?.(e.message,"error"); } setSmsB(null); }}/>
