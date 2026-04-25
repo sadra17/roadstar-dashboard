@@ -241,8 +241,10 @@ export default function TodayPage({ onAlert }) {
       <PageHeader
         title="Today"
         sub={dateDisplay}
-        actions={<Btn small icon={<PlusIcon size={13} color="#fff"/>} onClick={() => setShowWalkIn(true)}>Walk-in</Btn>
-          <Btn small variant="ghost" icon={<RefreshIcon size={13}/>} onClick={() => load()}>Refresh</Btn>}
+        actions={<>
+          <Btn small icon={<PlusIcon size={13} color="#fff"/>} onClick={() => setShowWalkIn(true)}>Walk-in</Btn>
+          <Btn small variant="ghost" icon={<RefreshIcon size={13}/>} onClick={() => load()}>Refresh</Btn>
+        </>}
       />
 
       {/* Stats */}
