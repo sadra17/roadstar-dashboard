@@ -1,194 +1,201 @@
-// RoadstarDashboard.jsx  v9 — premium design, no emoji
+// RoadstarDashboard.jsx  v9 — mobile-first, zero horizontal scroll
 import { useState, useEffect, useCallback, useRef } from "react";
 import { getT, getTheme, toggleTheme, DARK, LIGHT } from "./theme.js";
 import { getUserRole, getUserName } from "./api.js";
-import SettingsPage   from "./SettingsPage.jsx";
-import TodayPage      from "./pages/TodayPage.jsx";
-import BookingsPage   from "./pages/BookingsPage.jsx";
-import LiveBayPage    from "./pages/LiveBayPage.jsx";
-import CustomersPage  from "./pages/CustomersPage.jsx";
-import AnalyticsPage  from "./pages/AnalyticsPage.jsx";
+import SettingsPage from "./SettingsPage.jsx";
+import TodayPage from "./pages/TodayPage.jsx";
+import BookingsPage from "./pages/BookingsPage.jsx";
+import LiveBayPage from "./pages/LiveBayPage.jsx";
+import CustomersPage from "./pages/CustomersPage.jsx";
+import AnalyticsPage from "./pages/AnalyticsPage.jsx";
 import { AuditLogPage, UsersPage, AdminPage } from "./pages/OtherPages.jsx";
 
-const SV = ({ s=16, c="currentColor", d }) => (
-  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c}
-    strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"
-    style={{ display:"block", flexShrink:0 }}>{d}</svg>
+// ── Inline icons ───────────────────────────────────────────────────────────────
+const Ic = ({ s=18, c="currentColor", ch }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth={2}
+    strokeLinecap="round" strokeLinejoin="round" style={{ display:"block", flexShrink:0 }}>{ch}</svg>
 );
+const CalI  = p => <Ic {...p} ch={<><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></>}/>;
+const BkI   = p => <Ic {...p} ch={<><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></>}/>;
+const BayI  = p => <Ic {...p} ch={<><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></>}/>;
+const UsrI  = p => <Ic {...p} ch={<><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></>}/>;
+const ChI   = p => <Ic {...p} ch={<><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/></>}/>;
+const SetI  = p => <Ic {...p} ch={<><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></>}/>;
+const LogI  = p => <Ic {...p} ch={<><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></>}/>;
+const ShpI  = p => <Ic {...p} ch={<><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></>}/>;
+const MnuI  = p => <Ic {...p} ch={<><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></>}/>;
+const SunI  = p => <Ic {...p} ch={<><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/></>}/>;
+const MooI  = p => <Ic {...p} ch={<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>}/>;
+const OutI  = p => <Ic {...p} ch={<><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></>}/>;
+const XIcon = p => <Ic {...p} ch={<path d="M18 6 6 18M6 6l12 12"/>}/>;
 
-const icons = {
-  today:     ({s,c}) => <SV s={s} c={c} d={<><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></>}/>,
-  bookings:  ({s,c}) => <SV s={s} c={c} d={<><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></>}/>,
-  livebay:   ({s,c}) => <SV s={s} c={c} d={<><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></>}/>,
-  customers: ({s,c}) => <SV s={s} c={c} d={<><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></>}/>,
-  analytics: ({s,c}) => <SV s={s} c={c} d={<><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/></>}/>,
-  settings:  ({s,c}) => <SV s={s} c={c} d={<><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></>}/>,
-  audit:     ({s,c}) => <SV s={s} c={c} d={<><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></>}/>,
-  users:     ({s,c}) => <SV s={s} c={c} d={<><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></>}/>,
-  admin:     ({s,c}) => <SV s={s} c={c} d={<><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></>}/>,
-};
+function getNavItems(role) {
+  const all = [
+    { id:"today",     label:"Today",        Icon:CalI,  roles:["superadmin","owner","frontdesk","mechanic"] },
+    { id:"bookings",  label:"Bookings",      Icon:BkI,   roles:["superadmin","owner","frontdesk"] },
+    { id:"livebay",   label:"Live at Bay",   Icon:BayI,  roles:["superadmin","owner","frontdesk","mechanic"] },
+    { id:"customers", label:"CRM",           Icon:UsrI,  roles:["superadmin","owner","frontdesk"] },
+    { id:"analytics", label:"Analytics",     Icon:ChI,   roles:["superadmin","owner"] },
+    { id:"settings",  label:"Settings",      Icon:SetI,  roles:["superadmin","owner"] },
+    { id:"audit",     label:"Audit Log",     Icon:LogI,  roles:["superadmin","owner"] },
+    { id:"users",     label:"Users",         Icon:UsrI,  roles:["superadmin","owner"] },
+    { id:"admin",     label:"Shops",         Icon:ShpI,  roles:["superadmin"] },
+  ];
+  return all.filter(n => n.roles.includes(role));
+}
 
-const NAV_ITEMS = [
-  { id:"today",     label:"Today"       },
-  { id:"bookings",  label:"Bookings"    },
-  { id:"livebay",   label:"Live at Bay" },
-  { id:"customers", label:"CRM"         },
-  { id:"analytics", label:"Analytics"   },
-  { id:"settings",  label:"Settings"    },
-  { id:"audit",     label:"Audit Log"   },
-  { id:"users",     label:"Users"       },
-  { id:"admin",     label:"Shops"       },
-];
-
-const ROLE_PAGES = {
-  superadmin: ["today","bookings","livebay","customers","analytics","settings","audit","users","admin"],
-  owner:      ["today","bookings","livebay","customers","analytics","settings","audit","users"],
-  frontdesk:  ["today","bookings","livebay","customers"],
-  mechanic:   ["today","livebay"],
-};
-
-function CheckSVG({ s, c }) { return <SV s={s} c={c} d={<path d="M20 6 9 17l-5-5"/>}/>; }
-function XSvg({ s, c })     { return <SV s={s} c={c} d={<path d="M18 6 6 18M6 6l12 12"/>}/>; }
-function SunSVG({ s, c })   { return <SV s={s} c={c} d={<><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/></>}/>; }
-function MoonSVG({ s, c })  { return <SV s={s} c={c} d={<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>}/>; }
-function OutSVG({ s, c })   { return <SV s={s} c={c} d={<><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></>}/>; }
-function MenuSVG({ s, c })  { return <SV s={s} c={c} d={<><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></>}/>; }
-
-// ── Sidebar ───────────────────────────────────────────────────────────────────
-function Sidebar({ T, theme, page, nav, name, role, onNav, onTheme, onLogout }) {
-  const NavItem = ({ id, label }) => {
-    const active = page === id;
-    const [h, setH] = useState(false);
-    const Icon = icons[id];
-    return (
-      <button
-        onClick={() => onNav(id)}
-        onMouseEnter={() => setH(true)}
-        onMouseLeave={() => setH(false)}
-        style={{
-          display:"flex", alignItems:"center", gap:9, width:"100%",
-          padding:"8px 10px", border:"none", borderRadius:T.r8,
-          cursor:"pointer", textAlign:"left", position:"relative",
-          fontFamily:T.font, transition:"background .1s",
-          background: active
-            ? theme === "dark" ? "rgba(37,99,235,.15)" : "rgba(37,99,235,.1)"
-            : h ? T.elevated : "transparent",
-          color: active ? T.textPrimary : h ? T.textPrimary : T.textSecond,
-          marginBottom: 1,
-        }}>
-        {active && <span style={{ position:"absolute", left:0, top:"18%", bottom:"18%", width:2.5, borderRadius:2, background:T.blue }}/>}
-        {Icon && <Icon s={14} c={active ? T.blue : h ? T.textPrimary : T.textMuted}/>}
-        <span style={{ fontSize:13, fontWeight:active ? 600 : 400 }}>{label}</span>
-      </button>
-    );
-  };
-
+// ── Alert toast ────────────────────────────────────────────────────────────────
+function AlertToast({ alerts, onDismiss }) {
+  const T = getT();
+  if (!alerts.length) return null;
   return (
-    <div style={{ width:220, background:T.sideBg, borderRight:`1px solid ${T.border}`, display:"flex", flexDirection:"column", height:"100vh", position:"sticky", top:0, flexShrink:0, overflowY:"auto" }}>
-
-      {/* Logo */}
-      <div style={{ padding:"16px 14px 14px", borderBottom:`1px solid ${T.border}`, flexShrink:0 }}>
-        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-          <div style={{ width:30, height:30, borderRadius:7, background:"#2563EB", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, boxShadow:"0 2px 10px rgba(37,99,235,.4)" }}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/>
-              <path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4"/>
-            </svg>
-          </div>
-          <div>
-            <div style={{ fontSize:12, fontWeight:800, color:T.textPrimary, letterSpacing:"0.07em" }}>ROADSTAR</div>
-            <div style={{ fontSize:9, color:T.textMuted, letterSpacing:"0.04em", marginTop:1, textTransform:"uppercase" }}>Tire Admin</div>
-          </div>
+    <div style={{ position:"fixed", bottom:20, right:16, zIndex:9999, display:"flex", flexDirection:"column", gap:8, maxWidth:"calc(100vw - 32px)" }}>
+      {alerts.map(a => (
+        <div key={a.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 14px",
+          background:a.type==="error"?T.redBg:T.greenBg, border:`1px solid ${a.type==="error"?T.redBorder:T.greenBorder}`,
+          borderRadius:T.r10, color:a.type==="error"?T.redText:T.greenText, fontSize:13, fontWeight:500,
+          boxShadow:"0 4px 20px rgba(0,0,0,.4)" }}>
+          <span style={{flex:1}}>{a.msg}</span>
+          <button onClick={() => onDismiss(a.id)} style={{ background:"none", border:"none", color:"inherit", cursor:"pointer", padding:0, opacity:0.7 }}>
+            <XIcon s={14}/>
+          </button>
         </div>
-      </div>
-
-      {/* Nav */}
-      <nav style={{ flex:1, padding:"10px 8px", overflowY:"auto" }}>
-        {nav.map(n => <NavItem key={n.id} id={n.id} label={n.label}/>)}
-      </nav>
-
-      {/* Bottom */}
-      <div style={{ padding:"10px 8px 14px", borderTop:`1px solid ${T.border}`, flexShrink:0 }}>
-        {/* User */}
-        <div style={{ display:"flex", alignItems:"center", gap:9, padding:"8px 10px", background:T.elevated, border:`1px solid ${T.border}`, borderRadius:T.r8, marginBottom:8 }}>
-          <div style={{ width:26, height:26, borderRadius:6, background:T.blueSubtle, border:`1px solid ${T.blue}40`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, fontWeight:700, color:T.blue, flexShrink:0 }}>
-            {(name[0]||"A").toUpperCase()}
-          </div>
-          <div style={{ flex:1, minWidth:0 }}>
-            <div style={{ fontSize:12, fontWeight:600, color:T.textPrimary, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{name}</div>
-            <div style={{ fontSize:10, color:T.textMuted, textTransform:"capitalize" }}>{role}</div>
-          </div>
-        </div>
-
-        {/* Controls row */}
-        <div style={{ display:"flex", gap:5 }}>
-          {[
-            { label:theme==="dark"?"Light":"Dark", Icon:theme==="dark"?SunSVG:MoonSVG, onClick:onTheme, hoverColor:T.amber },
-            { label:"Sign out", Icon:OutSVG, onClick:onLogout, hoverColor:T.red },
-          ].map(({ label, Icon, onClick, hoverColor }) => (
-            <button key={label} onClick={onClick}
-              style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", gap:5, padding:"6px 0", border:`1px solid ${T.border}`, borderRadius:T.r8, background:"transparent", color:T.textMuted, fontSize:11, cursor:"pointer", fontFamily:T.font }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor=hoverColor; e.currentTarget.style.color=hoverColor; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor=T.border; e.currentTarget.style.color=T.textMuted; }}>
-              <Icon s={12}/> {label}
-            </button>
-          ))}
-        </div>
-
-        <div style={{ fontSize:9, color:T.textMuted, textAlign:"center", marginTop:10, opacity:0.45, letterSpacing:"0.05em" }}>
-          Built by Social Aura
-        </div>
-      </div>
+      ))}
     </div>
   );
 }
 
-// ── Main ──────────────────────────────────────────────────────────────────────
+// ── Main dashboard ─────────────────────────────────────────────────────────────
 export default function RoadstarDashboard({ onLogout }) {
-  const [theme,  setTheme]  = useState(getTheme());
-  const [page,   setPage]   = useState("today");
-  const [drawer, setDrawer] = useState(false);
-  const [alerts, setAlerts] = useState([]);
+  const [theme,   setTheme]   = useState(getTheme());
+  const [page,    setPage]    = useState("today");
+  const [drawer,  setDrawer]  = useState(false);
+  const [alerts,  setAlerts]  = useState([]);
   const alertId = useRef(0);
-  const T = theme === "dark" ? DARK : LIGHT;
 
-  const role    = getUserRole() || "owner";
-  const name    = getUserName() || "Admin";
-  const allowed = ROLE_PAGES[role] || ROLE_PAGES.owner;
-  const nav     = NAV_ITEMS.filter(n => allowed.includes(n.id));
+  const role = getUserRole() || "owner";
+  const name = getUserName() || "Admin";
+  const nav  = getNavItems(role);
+
+  const T = theme === "light" ? LIGHT : DARK;
 
   useEffect(() => {
-    if (!allowed.includes(page)) setPage(nav[0]?.id || "today");
+    if (!nav.find(n => n.id === page)) setPage(nav[0]?.id || "today");
   }, [role]);
 
-  useEffect(() => {
-    document.body.style.cssText = `margin:0;background:${T.pageBg};font-family:${T.font};overflow-x:hidden`;
-    const s = document.createElement("style");
-    s.id = "rs-g";
-    s.textContent = [
-      "@keyframes spin{to{transform:rotate(360deg)}}",
-      "@keyframes rsSlide{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}",
-      "*{box-sizing:border-box}",
-      "::-webkit-scrollbar{width:5px;height:5px}",
-      `::-webkit-scrollbar-track{background:transparent}`,
-      `::-webkit-scrollbar-thumb{background:${T.border};border-radius:4px}`,
-    ].join("");
-    document.getElementById("rs-g")?.remove();
-    document.head.appendChild(s);
-  }, [theme]);
-
-  const pushAlert = useCallback((msg, type="info") => {
+  const pushAlert = useCallback((msg, type = "ok") => {
     const id = ++alertId.current;
-    setAlerts(p => [...p, { id, msg, type:type==="error"?"error":"ok" }]);
-    setTimeout(() => setAlerts(p => p.filter(a => a.id !== id)), 4500);
+    setAlerts(p => [...p, { id, msg, type }]);
+    setTimeout(() => setAlerts(p => p.filter(a => a.id !== id)), 4000);
   }, []);
 
-  const doTheme = () => {
-    const next = toggleTheme(); setTheme(next);
-    document.body.style.background = next==="dark" ? DARK.pageBg : LIGHT.pageBg;
+  const handleTheme = () => {
+    const next = toggleTheme();
+    setTheme(next);
+    document.body.style.background = next === "light" ? LIGHT.pageBg : DARK.pageBg;
   };
 
-  const PAGES = {
+  const navigate = (id) => { setPage(id); setDrawer(false); };
+
+  // Apply global styles
+  useEffect(() => {
+    document.body.style.background = T.pageBg;
+    document.body.style.margin     = "0";
+    document.body.style.overflowX  = "hidden";
+    const style = document.createElement("style");
+    style.id = "rs-global";
+    style.textContent = `
+      @keyframes spin { to { transform: rotate(360deg); } }
+      * { box-sizing: border-box; }
+      ::-webkit-scrollbar { width: 5px; height: 5px; }
+      ::-webkit-scrollbar-track { background: ${T.pageBg}; }
+      ::-webkit-scrollbar-thumb { background: ${T.border}; border-radius: 3px; }
+    `;
+    document.getElementById("rs-global")?.remove();
+    document.head.appendChild(style);
+  }, [theme]);
+
+  const SIDEBAR_W = 220;
+
+  // ── Nav item ──────────────────────────────────────────────────────────────
+  function NavItem({ id, label, Icon }) {
+    const active = page === id;
+    const [h, setH] = useState(false);
+    return (
+      <button onClick={() => navigate(id)}
+        onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
+        style={{ display:"flex", alignItems:"center", gap:10, width:"100%", padding:"10px 14px",
+          border:"none", borderRadius:T.r8, borderLeft:`3px solid ${active?T.blue:"transparent"}`,
+          background:active ? (theme==="dark"?"#1a2540":T.blueSubtle) : h ? T.elevated : "transparent",
+          cursor:"pointer", textAlign:"left", color:active?T.blueBright:h?T.textPrimary:T.textSecond,
+          transition:"all .12s", marginBottom:2 }}>
+        <Icon s={15} c={active?T.blue:h?T.textPrimary:T.textMuted}/>
+        <span style={{ fontSize:13, fontWeight:active?600:400, fontFamily:T.font }}>{label}</span>
+      </button>
+    );
+  }
+
+  // ── Sidebar content ────────────────────────────────────────────────────────
+  function SidebarContent() {
+    return (
+      <div style={{ display:"flex", flexDirection:"column", height:"100%", background:T.sideBg || T.cardBg }}>
+        {/* Logo */}
+        <div style={{ padding:"20px 16px 16px", borderBottom:`1px solid ${T.border}`, flexShrink:0 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+            <div style={{ width:34, height:34, borderRadius:"50%", background:T.blueSubtle, border:`1.5px solid ${T.blue}40`,
+              display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={T.blueBright} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/>
+                <path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4"/>
+              </svg>
+            </div>
+            <div>
+              <div style={{ fontSize:13, fontWeight:800, color:T.textPrimary, letterSpacing:"0.04em" }}>ROADSTAR</div>
+              <div style={{ fontSize:10, color:T.textMuted, letterSpacing:"0.1em" }}>TIRE ADMIN</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Nav */}
+        <nav style={{ flex:1, padding:"12px 8px", overflowY:"auto" }}>
+          {nav.map(n => <NavItem key={n.id} {...n}/>)}
+        </nav>
+
+        {/* Bottom */}
+        <div style={{ padding:"12px 10px", borderTop:`1px solid ${T.border}`, flexShrink:0 }}>
+          {/* User pill */}
+          <div style={{ display:"flex", alignItems:"center", gap:8, padding:"8px 10px", marginBottom:6,
+            background:T.elevated, borderRadius:T.r8 }}>
+            <div style={{ width:28, height:28, borderRadius:"50%", background:T.blueSubtle, border:`1px solid ${T.blue}30`,
+              display:"flex", alignItems:"center", justifyContent:"center", fontWeight:700, fontSize:11, color:T.blueBright, flexShrink:0 }}>
+              {name[0]?.toUpperCase() || "A"}
+            </div>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ fontSize:12, fontWeight:600, color:T.textPrimary, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{name}</div>
+              <div style={{ fontSize:10, color:T.textMuted, textTransform:"capitalize" }}>{role}</div>
+            </div>
+          </div>
+          {/* Theme */}
+          <button onClick={handleTheme} style={{ display:"flex", alignItems:"center", gap:8, width:"100%", padding:"7px 10px",
+            border:`1px solid ${T.border}`, borderRadius:T.r8, background:"transparent", color:T.textSecond,
+            fontSize:12, cursor:"pointer", fontFamily:T.font, marginBottom:4 }}>
+            {theme==="dark" ? <SunI s={13} c={T.amber}/> : <MooI s={13} c={T.blue}/>}
+            {theme==="dark" ? "Light mode" : "Dark mode"}
+          </button>
+          {/* Logout */}
+          <button onClick={onLogout} style={{ display:"flex", alignItems:"center", gap:8, width:"100%", padding:"7px 10px",
+            border:`1px solid ${T.border}`, borderRadius:T.r8, background:"transparent", color:T.red,
+            fontSize:12, cursor:"pointer", fontFamily:T.font }}>
+            <OutI s={13} c={T.red}/> Sign out
+          </button>
+          <div style={{ fontSize:9, color:T.textMuted, textAlign:"center", marginTop:10 }}>Built by Social Aura</div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Page map ──────────────────────────────────────────────────────────────
+  const PAGE_MAP = {
     today:     <TodayPage     key={theme} onAlert={pushAlert}/>,
     bookings:  <BookingsPage  key={theme} onAlert={pushAlert}/>,
     livebay:   <LiveBayPage   key={theme} onAlert={pushAlert}/>,
@@ -200,72 +207,72 @@ export default function RoadstarDashboard({ onLogout }) {
     admin:     <AdminPage     key={theme} onAlert={pushAlert}/>,
   };
 
-  const sidebarProps = { T, theme, page, nav, name, role, onNav:id=>{setPage(id);setDrawer(false);}, onTheme:doTheme, onLogout };
+  const currentLabel = nav.find(n => n.id === page)?.label || "Dashboard";
 
   return (
-    <div style={{ display:"flex", minHeight:"100vh", background:T.pageBg }}>
+    <div style={{ display:"flex", minHeight:"100vh", background:T.pageBg, fontFamily:T.font, overflowX:"hidden", position:"relative" }}>
 
-      {/* Desktop sidebar */}
-      <Sidebar {...sidebarProps}/>
-
-      {/* Content */}
-      <div style={{ flex:1, minWidth:0, display:"flex", flexDirection:"column" }}>
-        {/* Mobile topbar */}
-        <div style={{ display:"none", height:50, background:T.sideBg, borderBottom:`1px solid ${T.border}`, alignItems:"center", gap:12, padding:"0 16px", position:"sticky", top:0, zIndex:50, flexShrink:0 }} id="rs-topbar">
-          <button onClick={() => setDrawer(true)} style={{ width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", background:T.elevated, border:`1px solid ${T.border}`, borderRadius:T.r8, cursor:"pointer" }}>
-            <MenuSVG s={15} c={T.textPrimary}/>
-          </button>
-          <span style={{ fontSize:13, fontWeight:700, color:T.textPrimary }}>
-            {nav.find(n=>n.id===page)?.label||"Dashboard"}
-          </span>
-        </div>
-
-        <main style={{ flex:1, padding:"28px 32px", maxWidth:1160, width:"100%" }}>
-          {PAGES[page] || PAGES.today}
-        </main>
+      {/* ── Desktop sidebar ── */}
+      <div style={{ width:SIDEBAR_W, flexShrink:0, height:"100vh", position:"sticky", top:0, overflowY:"auto", borderRight:`1px solid ${T.border}` }}
+        className="rs-sidebar-desk">
+        <SidebarContent/>
       </div>
 
-      {/* Mobile drawer */}
+      {/* ── Mobile drawer overlay ── */}
       {drawer && (
-        <div style={{ position:"fixed", inset:0, zIndex:999 }}>
-          <div onClick={() => setDrawer(false)} style={{ position:"absolute", inset:0, background:"rgba(0,0,0,.6)" }}/>
-          <div style={{ position:"absolute", left:0, top:0, bottom:0, zIndex:1 }}>
-            <Sidebar {...sidebarProps}/>
+        <div onClick={() => setDrawer(false)}
+          style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.75)", zIndex:2000, display:"none" }}
+          className="rs-drawer-overlay">
+          <div onClick={e => e.stopPropagation()}
+            style={{ width:280, height:"100%", background:T.cardBg, borderRight:`1px solid ${T.border}` }}>
+            <SidebarContent/>
           </div>
         </div>
       )}
 
-      <style>{`@media(max-width:768px){#rs-topbar{display:flex!important}}`}</style>
+      {/* ── Main area ── */}
+      <div style={{ flex:1, minWidth:0, display:"flex", flexDirection:"column" }}>
 
-      {/* Toasts */}
-      {alerts.length > 0 && (
-        <div style={{ position:"fixed", bottom:20, right:20, zIndex:9999, display:"flex", flexDirection:"column", gap:8, maxWidth:340 }}>
-          {alerts.map(a => (
-            <div key={a.id} style={{
-              display:"flex", alignItems:"center", gap:10,
-              padding:"11px 12px 11px 14px",
-              background: a.type==="error" ? T.redBg    : T.cardBg,
-              border:    `1px solid ${a.type==="error" ? T.redBorder : T.greenBorder}`,
-              borderLeft:`3px solid ${a.type==="error" ? T.red      : T.green}`,
-              borderRadius:T.r10,
-              color:      a.type==="error" ? T.redText  : T.textPrimary,
-              fontSize:13, boxShadow:"0 4px 20px rgba(0,0,0,.35)",
-              animation:"rsSlide .2s ease",
-            }}>
-              <span style={{ flexShrink:0, opacity:.8 }}>
-                {a.type==="error"
-                  ? <XSvg s={13} c={T.red}/>
-                  : <CheckSVG s={13} c={T.green}/>}
-              </span>
-              <span style={{ flex:1, lineHeight:1.4 }}>{a.msg}</span>
-              <button onClick={() => setAlerts(p => p.filter(x => x.id !== a.id))}
-                style={{ background:"none", border:"none", cursor:"pointer", color:T.textMuted, padding:0, display:"flex", flexShrink:0 }}>
-                <XSvg s={13}/>
-              </button>
-            </div>
-          ))}
+        {/* Mobile top bar */}
+        <div style={{ display:"none", alignItems:"center", gap:12, padding:"0 16px", height:54,
+          background:T.cardBg, borderBottom:`1px solid ${T.border}`, flexShrink:0, position:"sticky", top:0, zIndex:100 }}
+          className="rs-topbar">
+          <button onClick={() => setDrawer(true)}
+            style={{ background:T.elevated, border:`1px solid ${T.border}`, borderRadius:T.r8,
+              width:36, height:36, display:"flex", alignItems:"center", justifyContent:"center",
+              cursor:"pointer", color:T.textPrimary, flexShrink:0 }}>
+            <MnuI s={16} c={T.textPrimary}/>
+          </button>
+          <div style={{ fontSize:14, fontWeight:700, color:T.textPrimary, flex:1 }}>{currentLabel}</div>
+          <button onClick={handleTheme}
+            style={{ background:T.elevated, border:`1px solid ${T.border}`, borderRadius:T.r8,
+              width:36, height:36, display:"flex", alignItems:"center", justifyContent:"center",
+              cursor:"pointer", flexShrink:0 }}>
+            {theme==="dark" ? <SunI s={14} c={T.amber}/> : <MooI s={14} c={T.blue}/>}
+          </button>
         </div>
-      )}
+
+        {/* Page content */}
+        <div style={{ flex:1, padding:"28px 28px 40px", minWidth:0, overflowX:"hidden" }} className="rs-page-content">
+          {PAGE_MAP[page] || <TodayPage onAlert={pushAlert}/>}
+        </div>
+      </div>
+
+      {/* ── Responsive styles ── */}
+      <style>{`
+        @media (max-width: 767px) {
+          .rs-sidebar-desk { display: none !important; }
+          .rs-topbar { display: flex !important; }
+          .rs-drawer-overlay { display: flex !important; }
+          .rs-page-content { padding: 16px 14px 32px !important; }
+        }
+        @media (min-width: 768px) {
+          .rs-topbar { display: none !important; }
+          .rs-drawer-overlay { display: none !important; }
+        }
+      `}</style>
+
+      <AlertToast alerts={alerts} onDismiss={id => setAlerts(p => p.filter(a => a.id !== id))}/>
     </div>
   );
 }
