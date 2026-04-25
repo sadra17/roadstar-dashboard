@@ -38,7 +38,7 @@ export function AuditLogPage({ onAlert }) {
         ))}
       </div>
       {loading ? <Spinner/> : logs.length === 0 ? (
-        <Empty icon="📋" title="No audit events" sub="Actions taken in the dashboard will appear here"/>
+        <Empty icon={null} title="No audit events" sub="Actions taken in the dashboard will appear here"/>
       ) : (
         <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
           {logs.map(l => (
@@ -202,7 +202,7 @@ export function AdminPage({ onAlert }) {
         actions={<Btn small icon={<PlusIcon size={13} color="#fff"/>} onClick={() => setModal(true)}>New Shop</Btn>}
       />
       {loading ? <Spinner/> : shops.length === 0 ? (
-        <Empty icon="🏪" title="No shops yet" sub="Create your first client shop to get started"/>
+        <Empty icon={null} title="No shops yet" sub="Create your first client shop to get started"/>
       ) : (
         <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))", gap:12 }}>
           {shops.map(s => (

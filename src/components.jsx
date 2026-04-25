@@ -102,13 +102,18 @@ export function ModalTitle({ children, sub }) {
 }
 
 // ── Empty state ───────────────────────────────────────────────────────────────
-export function Empty({ icon, title, sub }) {
+export function Empty({ title, sub, icon }) {
   const T = getT();
   return (
-    <div style={{ padding:"48px 20px", textAlign:"center" }}>
-      {icon && <div style={{ fontSize:32, marginBottom:12 }}>{icon}</div>}
+    <div style={{ padding:"56px 20px", textAlign:"center" }}>
+      <div style={{ width:44, height:44, borderRadius:"50%", background:T.elevated, border:`1px solid ${T.border}`, display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 14px" }}>
+        {icon
+          ? <span style={{ display:"flex", alignItems:"center", justifyContent:"center" }}>{icon}</span>
+          : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={T.textMuted} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+        }
+      </div>
       <div style={{ fontSize:14, fontWeight:600, color:T.textPrimary, marginBottom:6 }}>{title}</div>
-      {sub && <div style={{ fontSize:12, color:T.textMuted }}>{sub}</div>}
+      {sub && <div style={{ fontSize:12, color:T.textMuted, maxWidth:260, margin:"0 auto", lineHeight:1.6 }}>{sub}</div>}
     </div>
   );
 }
@@ -151,13 +156,14 @@ export function Card({ children, style = {} }) {
 export function StatCard({ label, value, sub, accent, icon }) {
   const T = getT();
   return (
-    <div style={{ background:T.cardBg, border:`1px solid ${T.border}`, borderLeft:`3px solid ${accent||T.blue}`, borderRadius:T.r12, padding:"14px 16px" }}>
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:6 }}>
-        <div style={{ fontSize:11, fontWeight:600, letterSpacing:"0.06em", textTransform:"uppercase", color:T.textMuted }}>{label}</div>
-        {icon && <span style={{ fontSize:16, opacity:0.7 }}>{icon}</span>}
+    <div style={{ background:T.cardBg, border:`1px solid ${T.border}`, borderRadius:T.r12, padding:"16px 18px", position:"relative", overflow:"hidden" }}>
+      <div style={{ position:"absolute", top:0, left:0, bottom:0, width:3, background:accent||T.blue, borderRadius:"3px 0 0 3px" }}/>
+      <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", marginBottom:8 }}>
+        <div style={{ fontSize:10, fontWeight:600, letterSpacing:"0.07em", textTransform:"uppercase", color:T.textMuted }}>{label}</div>
+        {icon && <span style={{ display:"flex", alignItems:"center", justifyContent:"center", opacity:0.6 }}>{icon}</span>}
       </div>
-      <div style={{ fontSize:28, fontWeight:800, color:T.textPrimary, lineHeight:1, letterSpacing:"-0.03em", fontVariantNumeric:"tabular-nums" }}>{value}</div>
-      {sub && <div style={{ fontSize:11, color:T.textMuted, marginTop:4 }}>{sub}</div>}
+      <div style={{ fontSize:26, fontWeight:800, color:T.textPrimary, lineHeight:1, letterSpacing:"-0.03em", fontVariantNumeric:"tabular-nums" }}>{value}</div>
+      {sub && <div style={{ fontSize:11, color:T.textMuted, marginTop:5, lineHeight:1.4 }}>{sub}</div>}
     </div>
   );
 }

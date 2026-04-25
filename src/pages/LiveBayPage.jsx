@@ -63,7 +63,7 @@ export default function LiveBayPage({ onAlert }) {
       {loading ? <Spinner/> : (
         <>
           {data.active.length === 0 ? (
-            <Empty icon="🚗" title="No cars in a bay right now" sub="Confirmed bookings will appear here when their appointment time arrives"/>
+            <Empty icon={null} title="No cars in a bay right now" sub="Confirmed bookings will appear here when their appointment time arrives"/>
           ) : (
             <>
               <div style={{ fontSize:12, color:T.textMuted, marginBottom:12 }}>
@@ -82,7 +82,7 @@ export default function LiveBayPage({ onAlert }) {
                       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
                         <span style={{ fontSize:11, fontWeight:700, letterSpacing:"0.07em", textTransform:"uppercase", color, background:`${color}18`, padding:"3px 9px", borderRadius:20 }}>{bayLabel}</span>
                         <span style={{ fontSize:12, fontWeight:700, color:isOver?T.red:isSoon?T.amber:T.green }}>
-                          {isOver ? "⏰ Overdue" : `${b.minutesRemaining} min left`}
+                          {isOver ? "Overdue" : `${b.minutesRemaining} min left`}
                         </span>
                       </div>
 
@@ -95,13 +95,13 @@ export default function LiveBayPage({ onAlert }) {
                       <div style={{ fontSize:16, fontWeight:700, color:T.textPrimary, marginBottom:2 }}>{b.firstName} {b.lastName}</div>
                       <div style={{ fontSize:12, fontWeight:600, color, marginBottom:4, textTransform:"uppercase", letterSpacing:"0.04em" }}>{displaySvc(b)}</div>
                       <div style={{ fontSize:11, color:T.textMuted, marginBottom:b.tireSize?4:10 }}>{b.time} · {effectiveOcc(b)} min total{b._extendedBy > 0 ? ` (+${b._extendedBy} extended)` : ""}</div>
-                      {b.tireSize && <div style={{ fontSize:11, color:T.orange, marginBottom:10 }}>🔧 {b.tireSize}</div>}
-                      {b.mechanicNotes && <div style={{ fontSize:11, color:T.textSecond, fontStyle:"italic", marginBottom:10, background:T.elevated, padding:"6px 9px", borderRadius:T.r8 }}>📝 {b.mechanicNotes}</div>}
+                      {b.tireSize && <div style={{ fontSize:11, color:T.orange, marginBottom:10, display:"flex", alignItems:"center", gap:4 }}><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/><path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4"/></svg>{b.tireSize}</div>}
+                      {b.mechanicNotes && <div style={{ fontSize:11, color:T.textSecond, marginBottom:10, background:T.elevated, padding:"6px 9px", borderRadius:T.r8, display:"flex", alignItems:"flex-start", gap:5 }}><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0,marginTop:1,opacity:0.6}}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>{b.mechanicNotes}</div>}
 
                       {/* Alert */}
                       {(isOver || isSoon) && (
                         <div style={{ background:T.redBg, border:`1px solid ${T.redBorder}`, borderRadius:T.r8, padding:"8px 10px", marginBottom:10, fontSize:12, fontWeight:600, color:T.redText }}>
-                          ⏰ Is this done? — {b.firstName}
+                          Is this done? — {b.firstName}
                         </div>
                       )}
 

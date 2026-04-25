@@ -4,6 +4,13 @@ import { fetchBookings, fetchRecentlyDeleted, updateBooking, deleteBooking, rest
 import { getT, sm, displaySvc, effectiveOcc, fmtDate, todayStr } from "../theme.js";
 import { Badge, Btn, IBtn, Modal, ModalTitle, Inp, Sel, PageHeader, Spinner, Empty, Card, SearchIcon, RefreshIcon, CheckIcon, XIcon, FlagIcon, MsgIcon, TrashIcon, PenIcon, NoteIcon, RestoreIcon, PlusIcon, DownloadIcon } from "../components.jsx";
 
+
+const DollarIcon = ({ size=14, color="currentColor" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" style={{display:"block",flexShrink:0}}>
+    <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+  </svg>
+);
+
 const STATUSES = ["all","pending","confirmed","waitlist","completed","cancelled","no_show"];
 const TIME_SLOTS = ["9:00 AM","9:15 AM","9:30 AM","9:45 AM","10:00 AM","10:15 AM","10:30 AM","10:45 AM","11:00 AM","11:15 AM","11:30 AM","11:45 AM","12:00 PM","12:15 PM","12:30 PM","12:45 PM","1:00 PM","1:15 PM","1:30 PM","1:45 PM","2:00 PM","2:15 PM","2:30 PM","2:45 PM","3:00 PM","3:15 PM","3:30 PM","3:45 PM","4:00 PM","4:15 PM","4:30 PM","4:45 PM","5:00 PM","5:15 PM","5:30 PM","5:45 PM"];
 
@@ -21,7 +28,7 @@ function BookingRow({ b, onUpdate, onDelete, onSMS, onEdit, onPayment, onAlert }
         <div style={{ fontSize:11, color:T.textMuted }}>{b.phone}{b.email && <span style={{ marginLeft:8 }}>{b.email}</span>}</div>
         <div style={{ fontSize:11, fontWeight:600, color:s.color, textTransform:"uppercase", letterSpacing:"0.04em", marginTop:2 }}>{displaySvc(b)}</div>
         {b.tireSize && <div style={{ fontSize:10, color:T.orange, marginTop:1 }}>{b.tireSize}</div>}
-        {b.notes && <div style={{ fontSize:11, color:T.textMuted, fontStyle:"italic", marginTop:2 }}>📝 {b.notes}</div>}
+        {b.notes && <div style={{ fontSize:11, color:T.textMuted, marginTop:3, display:"flex", alignItems:"flex-start", gap:4 }}><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0,marginTop:1}}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>{b.notes}</div>}
         {b.finalPrice != null && <div style={{ fontSize:11, color:T.green, marginTop:1 }}>${b.finalPrice} · {b.paymentStatus||"unpaid"}</div>}
       </div>
       <Badge status={b.status}/>
@@ -30,7 +37,8 @@ function BookingRow({ b, onUpdate, onDelete, onSMS, onEdit, onPayment, onAlert }
         {!["completed","cancelled"].includes(b.status) && <IBtn v="complete" title="Mark Complete" onClick={() => onEdit(b,"complete")} disabled={busy}><FlagIcon size={14}/></IBtn>}
         {!["cancelled","completed"].includes(b.status) && <IBtn v="decline" title="Cancel" onClick={() => act({status:"cancelled"})} disabled={busy}><XIcon size={14}/></IBtn>}
         <IBtn v="sms"   title="Send SMS" onClick={() => onSMS(b)}    disabled={busy}><MsgIcon size={14}/></IBtn>
-        <IBtn v="edit"  title="Edit"     onClick={() => onEdit(b)}   disabled={busy}><PenIcon size={14}/></IBtn>
+        <IBtn v="edit"  title="Edit"     onClick={() => onEdit(b)}     disabled={busy}><PenIcon size={14}/></IBtn>
+        <IBtn v="sms"   title="Payment"  onClick={() => onPayment(b)}   disabled={busy}><DollarIcon size={14}/></IBtn>
         <IBtn v="trash" title="Delete"   onClick={() => onDelete(b.id)} disabled={busy}><TrashIcon size={14}/></IBtn>
       </div>
     </div>
@@ -127,7 +135,7 @@ export default function BookingsPage({ onAlert }) {
       </div>
 
       {loading ? <Spinner/> : shown.length === 0 ? (
-        <Empty icon="📋" title="No bookings" sub={tab==="deleted" ? "No recently deleted bookings" : "No bookings match your filters"}/>
+        <Empty icon={null} title="No bookings" sub={tab==="deleted" ? "No recently deleted bookings" : "No bookings match your filters"}/>
       ) : (
         <div style={{ display:"flex", flexDirection:"column", gap:7 }}>
           {tab === "deleted"
@@ -171,7 +179,17 @@ export default function BookingsPage({ onAlert }) {
         </Modal>
       )}
 
-      {/* SMS modal */}
+
+      {/* Payment modal */}
+      {editB && editMode === "payment" && (
+        <PaymentModal booking={editB} onClose={() => setEditB(null)}
+          onSave={async (id, u) => {
+            try { await updatePayment(id, u); await handleUpdate(id, {}); onAlert?.("Payment updated"); setEditB(null); }
+            catch (e) { onAlert?.(e.message, "error"); }
+          }}/>
+      )}
+
+      {/* SMS modal */
       {smsB && (
         <SMSModal booking={smsB} onClose={() => setSmsB(null)}
           onSend={async (b, t) => { try { await sendSMS(b.id, t); onAlert?.("SMS sent"); } catch (e) { onAlert?.(e.message,"error"); } setSmsB(null); }}/>
@@ -230,6 +248,77 @@ function SMSModal({ booking: b, onClose, onSend }) {
       <Btn onClick={async()=>{setBusy(true);try{await onSend(b,type);}finally{setBusy(false);}}} disabled={busy} style={{ width:"100%", justifyContent:"center" }}>
         {busy?"Sending…":"Send SMS"}
       </Btn>
+    </Modal>
+  );
+}
+
+function PaymentModal({ booking: b, onClose, onSave }) {
+  const T = getT();
+  const [form, setForm] = useState({
+    quotedPrice:   b.quotedPrice   ?? "",
+    finalPrice:    b.finalPrice    ?? "",
+    paymentMethod: b.paymentMethod ?? "",
+    paymentStatus: b.paymentStatus ?? "unpaid",
+    paymentNotes:  b.paymentNotes  ?? "",
+  });
+  const [busy, setBusy] = useState(false);
+  const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
+  const Lbl = ({ children }) => (
+    <label style={{ display:"block", fontSize:11, fontWeight:600, letterSpacing:"0.07em", textTransform:"uppercase", color:T.textMuted, marginBottom:5 }}>{children}</label>
+  );
+  return (
+    <Modal onClose={onClose}>
+      <ModalTitle sub={`${b.firstName} ${b.lastName} — ${displaySvc(b)}`}>Payment & Pricing</ModalTitle>
+      <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+          <div>
+            <Lbl>Quoted price ($)</Lbl>
+            <Inp type="number" value={form.quotedPrice} onChange={e=>set("quotedPrice",e.target.value)} placeholder="0.00"/>
+          </div>
+          <div>
+            <Lbl>Final price ($)</Lbl>
+            <Inp type="number" value={form.finalPrice} onChange={e=>set("finalPrice",e.target.value)} placeholder="0.00"/>
+          </div>
+        </div>
+        <div>
+          <Lbl>Payment method</Lbl>
+          <Sel value={form.paymentMethod} onChange={e=>set("paymentMethod",e.target.value)}
+            options={[
+              {value:"",        label:"— Select —"},
+              {value:"cash",    label:"Cash"},
+              {value:"card",    label:"Card"},
+              {value:"cheque",  label:"Cheque"},
+              {value:"e-transfer",label:"e-Transfer"},
+              {value:"other",   label:"Other"},
+            ]}/>
+        </div>
+        <div>
+          <Lbl>Payment status</Lbl>
+          <Sel value={form.paymentStatus} onChange={e=>set("paymentStatus",e.target.value)}
+            options={[
+              {value:"unpaid",   label:"Unpaid"},
+              {value:"paid",     label:"Paid"},
+              {value:"partial",  label:"Partial"},
+              {value:"refunded", label:"Refunded"},
+            ]}/>
+        </div>
+        <div>
+          <Lbl>Notes</Lbl>
+          <Inp value={form.paymentNotes} onChange={e=>set("paymentNotes",e.target.value)} placeholder="Optional payment note"/>
+        </div>
+      </div>
+      <div style={{ display:"flex", gap:8, marginTop:16, paddingTop:14, borderTop:`1px solid ${T.border}` }}>
+        <Btn onClick={async()=>{setBusy(true);try{await onSave(b.id,{
+          quotedPrice:   form.quotedPrice   !== "" ? parseFloat(form.quotedPrice)   : null,
+          finalPrice:    form.finalPrice    !== "" ? parseFloat(form.finalPrice)    : null,
+          paymentMethod: form.paymentMethod || null,
+          paymentStatus: form.paymentStatus || null,
+          paymentNotes:  form.paymentNotes,
+        });}finally{setBusy(false);}}} disabled={busy} icon={<CheckIcon size={13} color="#fff"/>}>
+          {busy ? "Saving…" : "Save Payment"}
+        </Btn>
+        <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
+      </div>
     </Modal>
   );
 }
