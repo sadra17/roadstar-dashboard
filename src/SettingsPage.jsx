@@ -1,5 +1,5 @@
 // SettingsPage.jsx — with Error Boundary + debug output to find the real crash
-import { useState, useEffect, useCallback, Component } from "react";
+import { useState, useEffect, useCallback, useRef, Component } from "react";
 import { fetchSettings, updateSettings } from "./api.js";
 
 function getT() {
@@ -455,6 +455,7 @@ export default function SettingsPage({onAlert}) {
   const [err,   setErr] = useState("");
   const [dirty, setDirty]= useState(false);
   const [sec,   setSec] = useState("business");
+  const contentRef = useRef(null);
   const [mob,   setMob] = useState(false);
   const [mobC,  setMobC]= useState(false);
 
@@ -528,7 +529,7 @@ export default function SettingsPage({onAlert}) {
         const a = sec === id;
         return (
           <button key={id}
-            onClick={() => { setSec(id); if (mob) setMobC(true); }}
+            onClick={() => { setSec(id); if (mob) setMobC(true); if(contentRef.current) contentRef.current.scrollTop=0; window.scrollTo(0,0); }}
             style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",
               padding:"12px 16px",background:a?T.elevated:"transparent",border:"none",
               borderLeft:`3px solid ${a?T.blue:"transparent"}`,color:a?T.textPrimary:T.textMuted,

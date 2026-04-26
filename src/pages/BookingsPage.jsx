@@ -29,13 +29,16 @@ function BookingRow({ b, onUpdate, onDelete, onSMS, onEdit, onPayment, onAlert }
         <div style={{ fontSize:11, fontWeight:600, color:s.color, textTransform:"uppercase", letterSpacing:"0.04em", marginTop:2 }}>{displaySvc(b)}</div>
         {b.tireSize && <div style={{ fontSize:10, color:T.orange, marginTop:1 }}>{b.tireSize}</div>}
         {b.notes && <div style={{ fontSize:11, color:T.textMuted, marginTop:3, display:"flex", alignItems:"flex-start", gap:4 }}><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0,marginTop:1}}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>{b.notes}</div>}
-        {b.finalPrice != null && <div style={{ fontSize:11, color:T.green, marginTop:1 }}>${b.finalPrice} · {b.paymentStatus||"unpaid"}</div>}
+
       </div>
-      <Badge status={b.status}/>
+      <div style={{textAlign:"right",flexShrink:0}}>
+        <Badge status={b.status}/>
+        {b.finalPrice!=null&&<div style={{fontSize:12,fontWeight:700,color:T.green,marginTop:4}}>${b.finalPrice} <span style={{fontSize:10,color:T.textMuted,fontWeight:400}}>{b.paymentStatus||"unpaid"}</span></div>}
+      </div>
       <div style={{ display:"flex", gap:3, flexShrink:0 }}>
         {!["completed","cancelled"].includes(b.status) && b.status !== "confirmed" && <IBtn v="accept" title="Confirm" onClick={() => act({status:"confirmed"})} disabled={busy}><CheckIcon size={14}/></IBtn>}
         {!["completed","cancelled"].includes(b.status) && <IBtn v="complete" title="Mark Complete" onClick={() => onEdit(b,"complete")} disabled={busy}><FlagIcon size={14}/></IBtn>}
-        {!["cancelled","completed"].includes(b.status) && <IBtn v="decline" title="Cancel" onClick={() => { if(!window.confirm("Cancel this booking?")) return; act({status:"cancelled"}); }} disabled={busy}><XIcon size={14}/></IBtn>}
+        {!["cancelled","completed"].includes(b.status) && <IBtn v="decline" title="Cancel" onClick={() => act({status:"cancelled"})} disabled={busy}><XIcon size={14}/></IBtn>}
         <IBtn v="sms"   title="Send SMS" onClick={() => onSMS(b)}    disabled={busy}><MsgIcon size={14}/></IBtn>
         <IBtn v="edit"  title="Edit"     onClick={() => onEdit(b)}     disabled={busy}><PenIcon size={14}/></IBtn>
         <IBtn v="sms"   title="Payment"  onClick={() => onPayment(b)}   disabled={busy}><DollarIcon size={14}/></IBtn>
@@ -56,6 +59,7 @@ export default function BookingsPage({ onAlert }) {
   const [dateFilter, setDateFilter]= useState("");
   const [editB,      setEditB]     = useState(null);
   const [editMode,   setEditMode]  = useState("edit");
+  const [deleteId,   setDeleteId]   = useState(null);
   const [smsB,       setSmsB]      = useState(null);
 
   const load = useCallback(async () => {
@@ -150,7 +154,7 @@ export default function BookingsPage({ onAlert }) {
               ))
             : shown.map(b => (
                 <BookingRow key={b.id} b={b}
-                  onUpdate={handleUpdate} onDelete={async(id)=>{if(!window.confirm('Delete this booking? It can be restored from Recently Deleted.'))return;await handleDelete(id);}}
+                  onUpdate={handleUpdate} onDelete={id=>setDeleteId(id)}
                   onSMS={setSmsB} onEdit={(b, mode="edit") => { setEditB(b); setEditMode(mode); }}
                   onPayment={b => { setEditB(b); setEditMode("payment"); }}
                   onAlert={onAlert}
@@ -187,6 +191,25 @@ export default function BookingsPage({ onAlert }) {
             try { await updatePayment(id, u); await handleUpdate(id, {}); onAlert?.("Payment updated"); setEditB(null); }
             catch (e) { onAlert?.(e.message, "error"); }
           }}/>
+      )}
+
+      {/* Delete confirmation modal */}
+      {deleteId && (
+        <Modal onClose={() => setDeleteId(null)}>
+          <div style={{textAlign:"center",padding:"8px 0 16px"}}>
+            <div style={{width:48,height:48,borderRadius:"50%",background:T.redBg,border:`1px solid ${T.redBorder}`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px"}}>
+              <TrashIcon size={22} color={T.red}/>
+            </div>
+            <div style={{fontSize:16,fontWeight:700,color:T.textPrimary,marginBottom:8}}>Delete this booking?</div>
+            <div style={{fontSize:13,color:T.textMuted,marginBottom:20,lineHeight:1.5}}>
+              This booking will be moved to Recently Deleted<br/>and can be restored within 30 days.
+            </div>
+            <div style={{display:"flex",gap:10,justifyContent:"center"}}>
+              <Btn variant="danger" onClick={async()=>{await handleDelete(deleteId);setDeleteId(null);}} icon={<TrashIcon size={13} color={T.red}/>}>Yes, delete</Btn>
+              <Btn variant="ghost" onClick={()=>setDeleteId(null)}>Keep it</Btn>
+            </div>
+          </div>
+        </Modal>
       )}
 
       {/* SMS modal */}
