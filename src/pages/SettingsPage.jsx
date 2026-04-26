@@ -521,12 +521,15 @@ export default function SettingsPage({onAlert}) {
   const ActiveComp = SECTION_MAP[sec] || BusinessSection;
   const secProps = { s, set };
 
-  const NavList = () => (
+
+  // Shared nav JSX (rendered directly, not as a component)
+  const navJSX = (
     <div style={{background:T.cardBg,border:`1px solid ${T.border}`,borderRadius:T.r12,overflow:"hidden"}}>
       {SECTIONS.map(({id, label}) => {
         const a = sec === id;
         return (
-          <button key={id} onClick={() => { setSec(id); if (mob) setMobC(true); }}
+          <button key={id}
+            onClick={() => { setSec(id); if (mob) setMobC(true); }}
             style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",
               padding:"12px 16px",background:a?T.elevated:"transparent",border:"none",
               borderLeft:`3px solid ${a?T.blue:"transparent"}`,color:a?T.textPrimary:T.textMuted,
@@ -540,7 +543,8 @@ export default function SettingsPage({onAlert}) {
     </div>
   );
 
-  const SaveBar = () => (
+  // Save bar JSX (rendered directly, not as a component)
+  const saveJSX = (
     <div style={{paddingTop:16,marginTop:20,borderTop:`1px solid ${T.border}`,display:"flex",alignItems:"center",gap:12}}>
       <button onClick={save} disabled={sav}
         style={{padding:"10px 24px",borderRadius:T.r8,background:saved?T.greenBg:T.blue,
@@ -553,36 +557,50 @@ export default function SettingsPage({onAlert}) {
     </div>
   );
 
-  const Content = () => (
-    <SectionErrorBoundary key={sec}>
-      <ActiveComp {...secProps}/>
-    </SectionErrorBoundary>
-  );
-
+  // Mobile layout
   if (mob) {
-    if (!mobC) return <div><div style={{fontSize:18,fontWeight:700,color:T.textPrimary,marginBottom:16}}>Settings</div><NavList/></div>;
+    if (!mobC) return (
+      <div>
+        <div style={{fontSize:18,fontWeight:700,color:T.textPrimary,marginBottom:16}}>Settings</div>
+        {navJSX}
+      </div>
+    );
     return (
       <div>
-        <button onClick={() => setMobC(false)} style={{display:"flex",alignItems:"center",gap:6,background:"transparent",border:"none",color:T.blue,fontSize:13,fontFamily:T.font,cursor:"pointer",padding:"0 0 14px",fontWeight:600}}>
+        <button onClick={() => setMobC(false)}
+          style={{display:"flex",alignItems:"center",gap:6,background:"transparent",border:"none",
+            color:T.blue,fontSize:13,fontFamily:T.font,cursor:"pointer",padding:"0 0 14px",fontWeight:600}}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
           Settings
         </button>
-        <div style={{fontSize:15,fontWeight:700,color:T.textPrimary,marginBottom:16}}>{SECTIONS.find(x=>x.id===sec)?.label}</div>
-        <Content/>
-        <SaveBar/>
+        <div style={{fontSize:15,fontWeight:700,color:T.textPrimary,marginBottom:16}}>
+          {SECTIONS.find(x => x.id === sec)?.label}
+        </div>
+        <SectionErrorBoundary key={sec}>
+          <ActiveComp s={s} set={set}/>
+        </SectionErrorBoundary>
+        {saveJSX}
       </div>
     );
   }
 
+  // Desktop layout — NO inner component definitions
   return (
     <div style={{display:"flex",gap:24,alignItems:"flex-start"}}>
       <div style={{width:192,flexShrink:0,position:"sticky",top:80}}>
-        <NavList/>
-        {dirty && <div style={{marginTop:8,padding:"8px 12px",background:T.amberBg,border:`1px solid ${T.amberBorder}`,borderRadius:T.r8,fontSize:11,color:T.amberText,textAlign:"center"}}>Unsaved changes</div>}
+        {navJSX}
+        {dirty && (
+          <div style={{marginTop:8,padding:"8px 12px",background:T.amberBg,border:`1px solid ${T.amberBorder}`,
+            borderRadius:T.r8,fontSize:11,color:T.amberText,textAlign:"center"}}>
+            Unsaved changes
+          </div>
+        )}
       </div>
       <div style={{flex:1,minWidth:0}}>
-        <Content/>
-        <SaveBar/>
+        <SectionErrorBoundary key={sec}>
+          <ActiveComp s={s} set={set}/>
+        </SectionErrorBoundary>
+        {saveJSX}
       </div>
     </div>
   );
