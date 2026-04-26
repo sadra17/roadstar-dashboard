@@ -444,17 +444,6 @@ function BrandingSection({s, set}) {
 }
 
 // ── Section map ───────────────────────────────────────────────────────────────
-const SECTION_MAP = {
-  business:  BusinessSection,
-  hours:     HoursSection,
-  blackout:  BlackoutSection,
-  services:  ServicesSection,
-  capacity:  CapacitySection,
-  sms:       SMSSection,
-  review:    ReviewSection,
-  reminders: RemindersSection,
-  branding:  BrandingSection,
-};
 
 // ── Main component ─────────────────────────────────────────────────────────────
 export default function SettingsPage({onAlert}) {
@@ -518,7 +507,17 @@ export default function SettingsPage({onAlert}) {
   if (load) return <div style={{padding:"40px 0",textAlign:"center",color:T.textMuted,fontSize:13}}>Loading settings…</div>;
   if (!s)   return <div style={{color:T.redText,fontSize:13,padding:16,background:T.redBg,border:`1px solid ${T.redBorder}`,borderRadius:T.r10}}>{err || "Could not load settings."}</div>;
 
-  const ActiveComp = SECTION_MAP[sec] || BusinessSection;
+  // Direct conditional rendering - most stable React approach
+  const sectionProps = { s, set };
+  let SectionComp = BusinessSection;
+  if (sec === "hours")     SectionComp = HoursSection;
+  if (sec === "blackout")  SectionComp = BlackoutSection;
+  if (sec === "services")  SectionComp = ServicesSection;
+  if (sec === "capacity")  SectionComp = CapacitySection;
+  if (sec === "sms")       SectionComp = SMSSection;
+  if (sec === "review")    SectionComp = ReviewSection;
+  if (sec === "reminders") SectionComp = RemindersSection;
+  if (sec === "branding")  SectionComp = BrandingSection;
   const secProps = { s, set };
 
 
@@ -576,9 +575,7 @@ export default function SettingsPage({onAlert}) {
         <div style={{fontSize:15,fontWeight:700,color:T.textPrimary,marginBottom:16}}>
           {SECTIONS.find(x => x.id === sec)?.label}
         </div>
-        <SectionErrorBoundary key={sec}>
-          <ActiveComp s={s} set={set}/>
-        </SectionErrorBoundary>
+        <SectionErrorBoundary key={sec}><SectionComp s={s} set={set}/></SectionErrorBoundary>
         {saveJSX}
       </div>
     );
@@ -597,9 +594,7 @@ export default function SettingsPage({onAlert}) {
         )}
       </div>
       <div style={{flex:1,minWidth:0}}>
-        <SectionErrorBoundary key={sec}>
-          <ActiveComp s={s} set={set}/>
-        </SectionErrorBoundary>
+        <SectionErrorBoundary key={sec}><SectionComp s={s} set={set}/></SectionErrorBoundary>
         {saveJSX}
       </div>
     </div>

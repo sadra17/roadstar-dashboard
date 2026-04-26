@@ -150,7 +150,7 @@ export default function BookingsPage({ onAlert }) {
               ))
             : shown.map(b => (
                 <BookingRow key={b.id} b={b}
-                  onUpdate={handleUpdate} onDelete={handleDelete}
+                  onUpdate={handleUpdate} onDelete={async(id)=>{if(!window.confirm('Delete this booking? It can be restored from Recently Deleted.'))return;await handleDelete(id);}}
                   onSMS={setSmsB} onEdit={(b, mode="edit") => { setEditB(b); setEditMode(mode); }}
                   onPayment={b => { setEditB(b); setEditMode("payment"); }}
                   onAlert={onAlert}
@@ -255,7 +255,6 @@ function SMSModal({ booking: b, onClose, onSend }) {
 function PaymentModal({ booking: b, onClose, onSave }) {
   const T = getT();
   const [form, setForm] = useState({
-    quotedPrice:   b.quotedPrice   ?? "",
     finalPrice:    b.finalPrice    ?? "",
     paymentMethod: b.paymentMethod ?? "",
     paymentStatus: b.paymentStatus ?? "unpaid",
@@ -270,15 +269,9 @@ function PaymentModal({ booking: b, onClose, onSave }) {
     <Modal onClose={onClose}>
       <ModalTitle sub={`${b.firstName} ${b.lastName} — ${displaySvc(b)}`}>Payment & Pricing</ModalTitle>
       <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
-          <div>
-            <Lbl>Quoted price ($)</Lbl>
-            <Inp type="number" value={form.quotedPrice} onChange={e=>set("quotedPrice",e.target.value)} placeholder="0.00"/>
-          </div>
-          <div>
-            <Lbl>Final price ($)</Lbl>
-            <Inp type="number" value={form.finalPrice} onChange={e=>set("finalPrice",e.target.value)} placeholder="0.00"/>
-          </div>
+        <div>
+          <Lbl>Price charged ($)</Lbl>
+          <Inp type="number" value={form.finalPrice} onChange={e=>set("finalPrice",e.target.value)} placeholder="0.00"/>
         </div>
         <div>
           <Lbl>Payment method</Lbl>
@@ -309,7 +302,6 @@ function PaymentModal({ booking: b, onClose, onSave }) {
       </div>
       <div style={{ display:"flex", gap:8, marginTop:16, paddingTop:14, borderTop:`1px solid ${T.border}` }}>
         <Btn onClick={async()=>{setBusy(true);try{await onSave(b.id,{
-          quotedPrice:   form.quotedPrice   !== "" ? parseFloat(form.quotedPrice)   : null,
           finalPrice:    form.finalPrice    !== "" ? parseFloat(form.finalPrice)    : null,
           paymentMethod: form.paymentMethod || null,
           paymentStatus: form.paymentStatus || null,
