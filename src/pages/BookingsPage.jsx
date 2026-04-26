@@ -35,7 +35,7 @@ function BookingRow({ b, onUpdate, onDelete, onSMS, onEdit, onPayment, onAlert }
       <div style={{ display:"flex", gap:3, flexShrink:0 }}>
         {!["completed","cancelled"].includes(b.status) && b.status !== "confirmed" && <IBtn v="accept" title="Confirm" onClick={() => act({status:"confirmed"})} disabled={busy}><CheckIcon size={14}/></IBtn>}
         {!["completed","cancelled"].includes(b.status) && <IBtn v="complete" title="Mark Complete" onClick={() => onEdit(b,"complete")} disabled={busy}><FlagIcon size={14}/></IBtn>}
-        {!["cancelled","completed"].includes(b.status) && <IBtn v="decline" title="Cancel" onClick={() => act({status:"cancelled"})} disabled={busy}><XIcon size={14}/></IBtn>}
+        {!["cancelled","completed"].includes(b.status) && <IBtn v="decline" title="Cancel" onClick={() => { if(!window.confirm("Cancel this booking?")) return; act({status:"cancelled"}); }} disabled={busy}><XIcon size={14}/></IBtn>}
         <IBtn v="sms"   title="Send SMS" onClick={() => onSMS(b)}    disabled={busy}><MsgIcon size={14}/></IBtn>
         <IBtn v="edit"  title="Edit"     onClick={() => onEdit(b)}     disabled={busy}><PenIcon size={14}/></IBtn>
         <IBtn v="sms"   title="Payment"  onClick={() => onPayment(b)}   disabled={busy}><DollarIcon size={14}/></IBtn>
