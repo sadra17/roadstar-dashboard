@@ -585,7 +585,7 @@ export default function SettingsPage({onAlert}) {
   // Desktop layout — NO inner component definitions
   return (
     <div style={{display:"flex",gap:24,alignItems:"flex-start"}}>
-      <div style={{width:192,flexShrink:0,position:"sticky",top:80}}>
+      <div style={{width:192,flexShrink:0,position:"sticky",top:24,alignSelf:"flex-start"}}>
         {navJSX}
         {dirty && (
           <div style={{marginTop:8,padding:"8px 12px",background:T.amberBg,border:`1px solid ${T.amberBorder}`,
@@ -594,7 +594,7 @@ export default function SettingsPage({onAlert}) {
           </div>
         )}
       </div>
-      <div style={{flex:1,minWidth:0}}>
+      <div style={{flex:1,minWidth:0,minHeight:"70vh"}}>
         <SectionErrorBoundary key={sec}><SectionComp s={s} set={set}/></SectionErrorBoundary>
         {saveJSX}
       </div>
