@@ -36,9 +36,9 @@ function BookingRow({ b, onUpdate, onDelete, onSMS, onEdit, onPayment, onAlert }
         {b.finalPrice!=null&&<div style={{fontSize:12,fontWeight:700,color:T.green,marginTop:4}}>${b.finalPrice} <span style={{fontSize:10,color:T.textMuted,fontWeight:400}}>{b.paymentStatus||"unpaid"}</span></div>}
       </div>
       <div style={{ display:"flex", gap:3, flexShrink:0 }}>
-        {!["completed","cancelled"].includes(b.status) && b.status !== "confirmed" && <IBtn v="accept" title="Confirm" onClick={() => act({status:"confirmed"})} disabled={busy}><CheckIcon size={14}/></IBtn>}
+        {!["completed","cancelled"].includes(b.status) && b.status !== "confirmed" && <IBtn v="accept" title="Confirm" onClick={() => setConfirmAct({id:b.id, type:"confirm", name:`${b.firstName} ${b.lastName}`})} disabled={busy}><CheckIcon size={14}/></IBtn>}
         {!["completed","cancelled"].includes(b.status) && <IBtn v="complete" title="Mark Complete" onClick={() => onEdit(b,"complete")} disabled={busy}><FlagIcon size={14}/></IBtn>}
-        {!["cancelled","completed"].includes(b.status) && <IBtn v="decline" title="Cancel" onClick={() => act({status:"cancelled"})} disabled={busy}><XIcon size={14}/></IBtn>}
+        {!["cancelled","completed"].includes(b.status) && <IBtn v="decline" title="Cancel" onClick={() => setConfirmAct({id:b.id, type:"cancel", name:`${b.firstName} ${b.lastName}`})} disabled={busy}><XIcon size={14}/></IBtn>}
         <IBtn v="sms"   title="Send SMS" onClick={() => onSMS(b)}    disabled={busy}><MsgIcon size={14}/></IBtn>
         <IBtn v="edit"  title="Edit"     onClick={() => onEdit(b)}     disabled={busy}><PenIcon size={14}/></IBtn>
         <IBtn v="sms"   title="Payment"  onClick={() => onPayment(b)}   disabled={busy}><DollarIcon size={14}/></IBtn>
@@ -60,6 +60,7 @@ export default function BookingsPage({ onAlert }) {
   const [editB,      setEditB]     = useState(null);
   const [editMode,   setEditMode]  = useState("edit");
   const [deleteId,   setDeleteId]   = useState(null);
+  const [confirmAct, setConfirmAct] = useState(null); // {id, type:'cancel'|'confirm'}
   const [smsB,       setSmsB]      = useState(null);
 
   const load = useCallback(async () => {
@@ -191,6 +192,29 @@ export default function BookingsPage({ onAlert }) {
             try { await updatePayment(id, u); await handleUpdate(id, {}); onAlert?.("Payment updated"); setEditB(null); }
             catch (e) { onAlert?.(e.message, "error"); }
           }}/>
+      )}
+
+      {/* Cancel / Confirm action modal */}
+      {confirmAct && (
+        <Modal onClose={() => setConfirmAct(null)}>
+          <div style={{textAlign:"center",padding:"8px 0 16px"}}>
+            <div style={{fontSize:16,fontWeight:700,color:T.textPrimary,marginBottom:8}}>
+              {confirmAct.type==="cancel" ? "Cancel this booking?" : "Confirm this booking?"}
+            </div>
+            <div style={{fontSize:13,color:T.textMuted,marginBottom:20}}>{confirmAct.name}</div>
+            <div style={{display:"flex",gap:10,justifyContent:"center"}}>
+              <Btn
+                variant={confirmAct.type==="cancel"?"danger":"success"}
+                onClick={async()=>{
+                  await handleUpdate(confirmAct.id,{status:confirmAct.type==="cancel"?"cancelled":"confirmed"});
+                  setConfirmAct(null);
+                }}>
+                {confirmAct.type==="cancel" ? "Yes, cancel" : "Yes, confirm"}
+              </Btn>
+              <Btn variant="ghost" onClick={()=>setConfirmAct(null)}>Go back</Btn>
+            </div>
+          </div>
+        </Modal>
       )}
 
       {/* Delete confirmation modal */}

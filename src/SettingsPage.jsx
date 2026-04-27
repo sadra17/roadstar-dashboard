@@ -122,6 +122,16 @@ function BusinessSection({s, set}) {
           {TZS.map(t => <option key={t} value={t} style={{background:T.cardBg}}>{t}</option>)}
         </select>
       </Field>
+      <Field label="Collect customer email" hint="Shows an email field on the Shopify booking form">
+        <label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer"}}>
+          <input type="checkbox" checked={s.collectEmailEnabled===true}
+            onChange={()=>set("collectEmailEnabled",!(s.collectEmailEnabled===true))}
+            style={{width:16,height:16,cursor:"pointer",accentColor:T.blue}}/>
+          <span style={{fontSize:13,color:T.textPrimary}}>
+            {s.collectEmailEnabled===true ? "Email field shown on booking form" : "Email field hidden"}
+          </span>
+        </label>
+      </Field>
     </>
   );
 }
