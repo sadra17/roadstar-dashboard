@@ -14,7 +14,7 @@ const DollarIcon = ({ size=14, color="currentColor" }) => (
 const STATUSES = ["all","pending","confirmed","waitlist","completed","cancelled","no_show"];
 const TIME_SLOTS = ["9:00 AM","9:15 AM","9:30 AM","9:45 AM","10:00 AM","10:15 AM","10:30 AM","10:45 AM","11:00 AM","11:15 AM","11:30 AM","11:45 AM","12:00 PM","12:15 PM","12:30 PM","12:45 PM","1:00 PM","1:15 PM","1:30 PM","1:45 PM","2:00 PM","2:15 PM","2:30 PM","2:45 PM","3:00 PM","3:15 PM","3:30 PM","3:45 PM","4:00 PM","4:15 PM","4:30 PM","4:45 PM","5:00 PM","5:15 PM","5:30 PM","5:45 PM"];
 
-function BookingRow({ b, onUpdate, onDelete, onSMS, onEdit, onPayment, onAlert }) {
+function BookingRow({ b, onUpdate, onDelete, onSMS, onEdit, onPayment, onAlert, onCancel, onConfirm }) {
   const T = getT(); const s = sm(b.status); const [busy, setBusy] = useState(false);
   const act = async (updates) => { setBusy(true); try { await onUpdate(b.id, updates); } catch (e) { onAlert?.(e.message,"error"); } finally { setBusy(false); } };
   return (
@@ -36,9 +36,9 @@ function BookingRow({ b, onUpdate, onDelete, onSMS, onEdit, onPayment, onAlert }
         {b.finalPrice!=null&&<div style={{fontSize:12,fontWeight:700,color:T.green,marginTop:4}}>${b.finalPrice} <span style={{fontSize:10,color:T.textMuted,fontWeight:400}}>{b.paymentStatus||"unpaid"}</span></div>}
       </div>
       <div style={{ display:"flex", gap:3, flexShrink:0 }}>
-        {!["completed","cancelled"].includes(b.status) && b.status !== "confirmed" && <IBtn v="accept" title="Confirm" onClick={() => setConfirmAct({id:b.id, type:"confirm", name:`${b.firstName} ${b.lastName}`})} disabled={busy}><CheckIcon size={14}/></IBtn>}
+        {!["completed","cancelled"].includes(b.status) && b.status !== "confirmed" && <IBtn v="accept" title="Confirm" onClick={() => onConfirm && onConfirm(b)} disabled={busy}><CheckIcon size={14}/></IBtn>}
         {!["completed","cancelled"].includes(b.status) && <IBtn v="complete" title="Mark Complete" onClick={() => onEdit(b,"complete")} disabled={busy}><FlagIcon size={14}/></IBtn>}
-        {!["cancelled","completed"].includes(b.status) && <IBtn v="decline" title="Cancel" onClick={() => setConfirmAct({id:b.id, type:"cancel", name:`${b.firstName} ${b.lastName}`})} disabled={busy}><XIcon size={14}/></IBtn>}
+        {!["cancelled","completed"].includes(b.status) && <IBtn v="decline" title="Cancel" onClick={() => onCancel && onCancel(b)} disabled={busy}><XIcon size={14}/></IBtn>}
         <IBtn v="sms"   title="Send SMS" onClick={() => onSMS(b)}    disabled={busy}><MsgIcon size={14}/></IBtn>
         <IBtn v="edit"  title="Edit"     onClick={() => onEdit(b)}     disabled={busy}><PenIcon size={14}/></IBtn>
         <IBtn v="sms"   title="Payment"  onClick={() => onPayment(b)}   disabled={busy}><DollarIcon size={14}/></IBtn>
@@ -159,6 +159,8 @@ export default function BookingsPage({ onAlert }) {
                   onSMS={setSmsB} onEdit={(b, mode="edit") => { setEditB(b); setEditMode(mode); }}
                   onPayment={b => { setEditB(b); setEditMode("payment"); }}
                   onAlert={onAlert}
+                  onCancel={b=>setConfirmAct({id:b.id,type:"cancel",name:`${b.firstName} ${b.lastName}`})}
+                  onConfirm={b=>setConfirmAct({id:b.id,type:"confirm",name:`${b.firstName} ${b.lastName}`})}
                 />
               ))
           }
@@ -189,7 +191,12 @@ export default function BookingsPage({ onAlert }) {
       {editB && editMode === "payment" && (
         <PaymentModal booking={editB} onClose={() => setEditB(null)}
           onSave={async (id, u) => {
-            try { await updatePayment(id, u); await handleUpdate(id, {}); onAlert?.("Payment updated"); setEditB(null); }
+            try {
+              const updated = await updatePayment(id, u);
+              setBookings(p => p.map(b => b.id === id ? updated : b));
+              onAlert?.("Payment saved");
+              setEditB(null);
+            }
             catch (e) { onAlert?.(e.message, "error"); }
           }}/>
       )}
