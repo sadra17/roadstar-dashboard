@@ -1,0 +1,48 @@
+{
+  "name": "Roadstar Tire — Admin",
+  "short_name": "Roadstar",
+  "description": "Roadstar Tire Admin Dashboard — bookings, customers, analytics",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#080c14",
+  "theme_color": "#2563EB",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Bookings",
+      "short_name": "Bookings",
+      "description": "View today's bookings",
+      "url": "/?tab=bookings",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Live Bay",
+      "short_name": "Live Bay",
+      "description": "Live bay status",
+      "url": "/?tab=live-bay",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

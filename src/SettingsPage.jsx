@@ -1,32 +1,7 @@
 // SettingsPage.jsx — with Error Boundary + debug output to find the real crash
 import { useState, useEffect, useCallback, useRef, Component } from "react";
 import { fetchSettings, updateSettings } from "./api.js";
-
-function getT() {
-  const dark = typeof localStorage === "undefined" || localStorage.getItem("rs_theme") !== "light";
-  if (!dark) return {
-    pageBg:"#f8fafc",cardBg:"#ffffff",elevated:"#f1f5f9",panelBg:"#ffffff",
-    border:"#e2e8f0",borderVis:"#cbd5e1",blue:"#2563EB",blueBright:"#1d4ed8",
-    blueSubtle:"#eff6ff",blueMuted:"#dbeafe",textPrimary:"#0f172a",
-    textSecond:"#475569",textMuted:"#94a3b8",green:"#16a34a",greenBg:"#f0fdf4",
-    greenBorder:"#bbf7d0",greenText:"#15803d",red:"#dc2626",redBg:"#fef2f2",
-    redBorder:"#fecaca",redText:"#dc2626",amber:"#d97706",amberBg:"#fffbeb",
-    amberBorder:"#fde68a",amberText:"#92400e",teal:"#0d9488",tealBg:"#f0fdfa",
-    tealBorder:"#99f6e4",tealText:"#0f766e",font:"'Inter',-apple-system,sans-serif",
-    r8:"8px",r10:"10px",r12:"12px",
-  };
-  return {
-    pageBg:"#07090f",cardBg:"#0d1120",elevated:"#111827",panelBg:"#0f1422",
-    border:"#1d2b40",borderVis:"#263550",blue:"#2563EB",blueBright:"#60A5FA",
-    blueSubtle:"#0c1a35",blueMuted:"#172554",textPrimary:"#F0F4FF",
-    textSecond:"#8896B0",textMuted:"#49576a",green:"#22C55E",greenBg:"#071a0f",
-    greenBorder:"#14532D",greenText:"#86EFAC",red:"#EF4444",redBg:"#1a0606",
-    redBorder:"#450a0a",redText:"#FCA5A5",amber:"#F59E0B",amberBg:"#1c1200",
-    amberBorder:"#3d2800",amberText:"#FCD34D",teal:"#14B8A6",tealBg:"#042f2e",
-    tealBorder:"#0f3d3a",tealText:"#5eead4",font:"'Inter',-apple-system,sans-serif",
-    r8:"8px",r10:"10px",r12:"12px",
-  };
-}
+import { getT } from "./theme.js"; // FE1: use shared theme token helper, not a local copy
 
 // ── Error Boundary — catches React component rendering errors ─────────────────
 class SectionErrorBoundary extends Component {

@@ -12,7 +12,19 @@ const DollarIcon = ({ size=14, color="currentColor" }) => (
 );
 
 const STATUSES = ["all","pending","confirmed","waitlist","completed","cancelled","no_show"];
-const TIME_SLOTS = ["9:00 AM","9:15 AM","9:30 AM","9:45 AM","10:00 AM","10:15 AM","10:30 AM","10:45 AM","11:00 AM","11:15 AM","11:30 AM","11:45 AM","12:00 PM","12:15 PM","12:30 PM","12:45 PM","1:00 PM","1:15 PM","1:30 PM","1:45 PM","2:00 PM","2:15 PM","2:30 PM","2:45 PM","3:00 PM","3:15 PM","3:30 PM","3:45 PM","4:00 PM","4:15 PM","4:30 PM","4:45 PM","5:00 PM","5:15 PM","5:30 PM","5:45 PM"];
+// UX4: generate 15-min slots 7 AM – 8:45 PM so admins can reschedule to any reasonable time,
+// even outside normal business hours (admin override). Avoids maintaining a manual list.
+const TIME_SLOTS = (() => {
+  const s = [];
+  for (let h = 7; h < 21; h++) {
+    for (let m = 0; m < 60; m += 15) {
+      const ampm = h < 12 ? "AM" : "PM";
+      const h12  = h === 0 ? 12 : h > 12 ? h - 12 : h;
+      s.push(`${h12}:${String(m).padStart(2,"0")} ${ampm}`);
+    }
+  }
+  return s;
+})();
 
 function BookingRow({ b, onUpdate, onDelete, onSMS, onEdit, onPayment, onAlert, onCancel, onConfirm }) {
   const T = getT(); const s = sm(b.status); const [busy, setBusy] = useState(false);

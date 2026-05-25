@@ -2,9 +2,38 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
     <title>Roadstar Tire — Admin</title>
-    <style>body { margin: 0; background: #080c14; }</style>
+    <meta name="description" content="Roadstar Tire Admin Dashboard — bookings, customers, live bay, analytics" />
+    <meta name="application-name" content="Roadstar Admin" />
+
+    <!-- PWA manifest -->
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- Theme colour (browser chrome on Android / Safari toolbar) -->
+    <meta name="theme-color" content="#2563EB" />
+    <meta name="msapplication-TileColor" content="#2563EB" />
+    <meta name="msapplication-TileImage" content="/icon-192.png" />
+
+    <!-- iOS home screen -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Roadstar" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="alternate icon" type="image/png" href="/icon-192.png" />
+
+    <!-- Prevent search engine indexing (private admin panel) -->
+    <meta name="robots" content="noindex, nofollow" />
+
+    <style>
+      body { margin: 0; background: #080c14; }
+      /* Prevent flash of unstyled content while React loads */
+      #root:empty { display: none; }
+    </style>
   </head>
   <body>
     <div id="root"></div>

@@ -46,7 +46,7 @@ function RevenueChart({ days }) {
           return (
             <div key={i} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:0, position:"relative" }}
               title={`${d.date}: ${d.bookings} bookings · $${(d.revenue||0).toFixed(2)}`}>
-              <div style={{ width:"100%", height:h, background:isOk ? T.blue : T.border, borderRadius:`${T.r4} ${T.r4} 0 0`, opacity:0.7 }}/>
+              <div style={{ width:"100%", height:h, background:isOk ? T.blue : T.border, borderRadius:`${T.r6} ${T.r6} 0 0`, opacity:0.7 }}/>
               <div style={{ fontSize:8, color:T.textMuted, transform:"rotate(-45deg)", transformOrigin:"top left", marginTop:4, whiteSpace:"nowrap", paddingLeft:2 }}>
                 {d.date.slice(5)}
               </div>

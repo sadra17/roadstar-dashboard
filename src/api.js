@@ -2,10 +2,15 @@
 const BASE   = import.meta.env.VITE_API_URL     || "https://roadstar-api.onrender.com/api";
 const SECRET = import.meta.env.VITE_ADMIN_SECRET || "";
 
-export const getToken    = () => localStorage.getItem("roadstar_token") || "";
-export const getShopId   = () => { try { const p = JSON.parse(atob(getToken().split(".")[1])); return p.shopId || ""; } catch { return ""; } };
-export const getUserRole = () => { try { const p = JSON.parse(atob(getToken().split(".")[1])); return p.role  || ""; } catch { return ""; } };
-export const getUserName = () => { try { const p = JSON.parse(atob(getToken().split(".")[1])); return p.name  || ""; } catch { return ""; } };
+export const getToken = () => localStorage.getItem("roadstar_token") || "";
+
+// FE2: single JWT decode helper — avoids repeating atob/JSON.parse in 3 places
+function parseToken() {
+  try { return JSON.parse(atob(getToken().split(".")[1])); } catch { return {}; }
+}
+export const getShopId   = () => parseToken().shopId || "";
+export const getUserRole = () => parseToken().role   || "";
+export const getUserName = () => parseToken().name   || "";
 
 const h = () => ({
   "Content-Type":   "application/json",
@@ -16,7 +21,17 @@ const h = () => ({
 async function api(path, opts = {}) {
   const res  = await fetch(`${BASE}${path}`, { headers: h(), ...opts });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.message || `API error ${res.status}`);
+  if (!res.ok) {
+    // FE5: on TOKEN_EXPIRED specifically, wipe token so the next render forces login
+    if (data.code === "TOKEN_EXPIRED") {
+      localStorage.removeItem("roadstar_token");
+      // Emit a custom event so App.jsx can show a "session expired" banner
+      // rather than silently breaking. Falls back to reload if no listener.
+      const expired = new CustomEvent("rs:sessionExpired");
+      if (!window.dispatchEvent(expired)) window.location.reload();
+    }
+    throw new Error(data.message || `API error ${res.status}`);
+  }
   return data;
 }
 
@@ -28,6 +43,24 @@ export const login = async (email, password) => {
   localStorage.setItem("roadstar_token", data.token);
   return data;
 };
+
+// Email OTP login — Step 1: request a 6-digit code
+export const requestOtp = async (email) => {
+  const res  = await fetch(`${BASE}/auth/request-otp`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || "Failed to send code");
+  return data;
+};
+
+// Email OTP login — Step 2: verify code, get JWT
+export const verifyOtp = async (email, code) => {
+  const res  = await fetch(`${BASE}/auth/verify-otp`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, code }) });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || "Invalid code");
+  if (data.token) localStorage.setItem("roadstar_token", data.token);
+  return data;
+};
+
 export const verifyToken = async () => {
   const res  = await fetch(`${BASE}/auth/verify`, { method: "POST", headers: h() });
   const data = await res.json();
