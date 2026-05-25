@@ -296,13 +296,14 @@ function CapacitySection({s, set}) {
 function SMSSection({s, set}) {
   const T = getT();
   const TMPL = [
-    {key:"confirmed",           label:"Appointment confirmed",   hint:"Sent when staff confirms"},
-    {key:"declined",            label:"Declined / cancelled",    hint:"Sent when staff cancels"},
-    {key:"waitlist",            label:"Waitlist spot opened",    hint:"Sent when a slot opens"},
-    {key:"reminder",            label:"Reminder",                hint:"Sent before appointment"},
-    {key:"completed_review",    label:"Completed + review link", hint:"Use {reviewLink}"},
-    {key:"completed_no_review", label:"Completed — no review",   hint:"Simple thank-you"},
-    {key:"no_show",             label:"No-show",                 hint:"Sent when marked no-show"},
+    {key:"confirmed",           label:"Appointment confirmed",         hint:"Sent when staff confirms"},
+    {key:"declined",            label:"Declined / cancelled",          hint:"Sent when staff cancels"},
+    {key:"waitlist",            label:"Waitlist spot opened",          hint:"Sent when a slot opens"},
+    {key:"reminder_advance",    label:"Advance reminder (12h / 24h)",  hint:"Sent the day before or 12h before"},
+    {key:"reminder",            label:"Same-day reminder",             hint:"Sent N minutes before appointment"},
+    {key:"completed_review",    label:"Completed + review link",       hint:"Use {reviewLink}"},
+    {key:"completed_no_review", label:"Completed — no review",         hint:"Simple thank-you"},
+    {key:"no_show",             label:"No-show",                       hint:"Sent when marked no-show"},
   ];
   const tmpl = s.smsTemplates || {};
   return (
@@ -370,29 +371,97 @@ function ReviewSection({s, set}) {
 }
 
 // ── REMINDERS SECTION ─────────────────────────────────────────────────────────
+function Toggle({checked, onChange, T}) {
+  return (
+    <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}}>
+      <input type="checkbox" checked={checked} onChange={onChange}
+        style={{width:16,height:16,cursor:"pointer",accentColor:T.blue}}/>
+      <span style={{fontSize:13,color:checked?T.textPrimary:T.textMuted}}>{checked?"On":"Off"}</span>
+    </label>
+  );
+}
+
 function RemindersSection({s, set}) {
-  const T = getT();
-  const on = s.reminderEnabled !== false;
+  const T    = getT();
+  const on   = s.reminderEnabled !== false;
+  const advOn = s.reminderAdvanceEnabled === true;
+
+  const rowStyle = {
+    background: T.elevated, border:`1px solid ${T.border}`, borderRadius:T.r10,
+    padding:"16px 18px", display:"flex", flexDirection:"column", gap:12,
+  };
+  const badge = (label, color) => (
+    <span style={{fontSize:10,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",
+      color, background:color+"22", border:`1px solid ${color}44`,
+      borderRadius:T.r6, padding:"2px 8px"}}>{label}</span>
+  );
+
   return (
     <>
-      <SectionTitle sub="Automatic SMS sent before appointments.">Reminders</SectionTitle>
-      <Field label="Enable reminders">
-        <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}}>
-          <input type="checkbox" checked={on} onChange={() => set("reminderEnabled", !on)}
-            style={{width:16,height:16,cursor:"pointer",accentColor:T.blue}}/>
-          <span style={{fontSize:13,color:T.textPrimary}}>{on ? "On" : "Off"}</span>
-        </label>
-      </Field>
-      {on && (
-        <Field label="Minutes before" hint="Default: 30">
-          <div style={{display:"flex",alignItems:"center",gap:12}}>
-            <input type="number" min="5" value={s.reminderMinutes || 30}
-              onChange={e => set("reminderMinutes", Math.max(5, Number(e.target.value)))}
-              style={{width:80,background:T.pageBg,border:`1.5px solid ${T.border}`,borderRadius:T.r8,
-                padding:"10px 12px",color:T.textPrimary,fontSize:13,fontFamily:T.font,outline:"none"}}/>
+      <SectionTitle sub="Automatic SMS reminders sent to customers before their appointment.">Reminders</SectionTitle>
+
+      {/* ── Reminder 1: Advance notice (12h / 24h) ─────────────────────── */}
+      <div style={rowStyle}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12}}>
+          <div>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:2}}>
+              <span style={{fontSize:13,fontWeight:700,color:T.textPrimary}}>Advance reminder</span>
+              {badge("Optional", T.blue)}
+            </div>
+            <div style={{fontSize:11,color:T.textMuted}}>
+              Sent 12 or 24 hours before — gives customers time to reschedule
+            </div>
+          </div>
+          <Toggle checked={advOn} onChange={() => set("reminderAdvanceEnabled", !advOn)} T={T}/>
+        </div>
+        {advOn && (
+          <div style={{display:"flex",alignItems:"center",gap:10,paddingTop:4,borderTop:`1px solid ${T.border}`}}>
+            <span style={{fontSize:12,color:T.textMuted,flexShrink:0}}>Send</span>
+            {[12, 24].map(h => (
+              <button key={h} type="button"
+                onClick={() => set("reminderAdvanceHours", h)}
+                style={{padding:"7px 18px",borderRadius:T.r8,fontSize:13,fontWeight:600,cursor:"pointer",
+                  border:`1.5px solid ${(s.reminderAdvanceHours||24)===h ? T.blue : T.border}`,
+                  background:(s.reminderAdvanceHours||24)===h ? T.blueSubtle : T.pageBg,
+                  color:(s.reminderAdvanceHours||24)===h ? T.blueBright : T.textMuted,
+                  fontFamily:T.font}}>
+                {h} hours before
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Reminder 2: Same-day (N minutes before) ────────────────────── */}
+      <div style={rowStyle}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12}}>
+          <div>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:2}}>
+              <span style={{fontSize:13,fontWeight:700,color:T.textPrimary}}>Same-day reminder</span>
+              {badge("Recommended", T.green)}
+            </div>
+            <div style={{fontSize:11,color:T.textMuted}}>
+              Sent on the day of the appointment — reduces no-shows
+            </div>
+          </div>
+          <Toggle checked={on} onChange={() => set("reminderEnabled", !on)} T={T}/>
+        </div>
+        {on && (
+          <div style={{display:"flex",alignItems:"center",gap:10,paddingTop:4,borderTop:`1px solid ${T.border}`}}>
+            <span style={{fontSize:12,color:T.textMuted,flexShrink:0}}>Send</span>
+            <input type="number" min="5" max="240" value={s.reminderMinutes || 30}
+              onChange={e => set("reminderMinutes", Math.max(5, Math.min(240, Number(e.target.value))))}
+              style={{width:68,background:T.pageBg,border:`1.5px solid ${T.border}`,borderRadius:T.r8,
+                padding:"8px 10px",color:T.textPrimary,fontSize:13,fontFamily:T.font,outline:"none",textAlign:"center"}}/>
             <span style={{fontSize:12,color:T.textMuted}}>minutes before</span>
           </div>
-        </Field>
+        )}
+      </div>
+
+      {!on && !advOn && (
+        <div style={{fontSize:12,color:T.textMuted,padding:"8px 4px"}}>
+          Both reminders are off. Enable at least one to reduce no-shows.
+        </div>
       )}
     </>
   );
