@@ -12,11 +12,16 @@ export const getShopId   = () => parseToken().shopId || "";
 export const getUserRole = () => parseToken().role   || "";
 export const getUserName = () => parseToken().name   || "";
 
-const h = () => ({
-  "Content-Type":   "application/json",
-  "Authorization":  `Bearer ${getToken()}`,
-  "x-admin-secret": SECRET,
-});
+const h = () => {
+  const headers = {
+    "Content-Type":  "application/json",
+    "Authorization": `Bearer ${getToken()}`,
+  };
+  // Only attach x-admin-secret if explicitly configured — avoids triggering the
+  // S3 production block that fires whenever this header is present + ADMIN_SECRET is set
+  if (SECRET) headers["x-admin-secret"] = SECRET;
+  return headers;
+};
 
 async function api(path, opts = {}) {
   const res  = await fetch(`${BASE}${path}`, { headers: h(), ...opts });
