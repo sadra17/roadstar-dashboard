@@ -1,5 +1,8 @@
 // pages/TodayPage.jsx — no emoji, SVG icons throughout
 import { useState, useEffect, useCallback, useRef } from "react";
+import { fetchBookings, fetchLiveBay, updateBooking, baySnooze, extendBay } from "../api.js";
+import { getT, sm, displaySvc, effectiveOcc, todayStr } from "../theme.js";
+import { Badge, Btn, IBtn, Modal, ModalTitle, Sel, Inp, StatCard, PageHeader, Spinner, CheckIcon, XIcon, FlagIcon, ClockIcon, BayIcon, RefreshIcon, PlusIcon } from "../components.jsx";
 
 // ── Loud notification sound (Web Audio API — no file needed) ──────────────────
 function playNewBookingAlert() {
@@ -24,11 +27,10 @@ function playNewBookingAlert() {
       osc.stop(t0 + durSec + 0.05);
     };
 
-    // Three-tone chime: low → mid → high
+    // Three-tone chime: low → mid → high, played twice for extra loudness
     beep(660,  0.00, 0.14);
     beep(880,  0.18, 0.14);
     beep(1100, 0.36, 0.28);
-    // Repeat once for extra volume
     beep(660,  0.72, 0.14);
     beep(880,  0.90, 0.14);
     beep(1100, 1.08, 0.28);
@@ -36,9 +38,6 @@ function playNewBookingAlert() {
     setTimeout(() => { try { ctx.close(); } catch {} }, 2500);
   } catch (_) { /* browser blocked audio or not supported */ }
 }
-import { fetchBookings, fetchLiveBay, updateBooking, baySnooze, extendBay } from "../api.js";
-import { getT, sm, displaySvc, effectiveOcc, todayStr } from "../theme.js";
-import { Badge, Btn, IBtn, Modal, ModalTitle, Sel, Inp, StatCard, PageHeader, Spinner, CheckIcon, XIcon, FlagIcon, ClockIcon, BayIcon, RefreshIcon, PlusIcon } from "../components.jsx";
 
 // Walk-in uses POST /api/book directly (same as Shopify form)
 async function createWalkIn(form) {
