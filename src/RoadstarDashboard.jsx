@@ -1,7 +1,7 @@
 // RoadstarDashboard.jsx  v9 — mobile-first, zero horizontal scroll
 import { useState, useEffect, useCallback, useRef } from "react";
-import { getT, getTheme, toggleTheme, DARK, LIGHT } from "./theme.js";
-import { getUserRole, getUserName } from "./api.js";
+import { getT, getTheme, toggleTheme, DARK, LIGHT, todayStr } from "./theme.js";
+import { getUserRole, getUserName, fetchBookings } from "./api.js";
 
 const SHOP_LABEL = (import.meta.env.VITE_SHOP_NAME || "Roadstar Tire").toUpperCase();
 import SettingsPage from "./SettingsPage.jsx";
@@ -29,7 +29,9 @@ const MnuI  = p => <Ic {...p} ch={<><line x1="3" y1="6" x2="21" y2="6"/><line x1
 const SunI  = p => <Ic {...p} ch={<><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/></>}/>;
 const MooI  = p => <Ic {...p} ch={<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>}/>;
 const OutI  = p => <Ic {...p} ch={<><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></>}/>;
-const XIcon = p => <Ic {...p} ch={<path d="M18 6 6 18M6 6l12 12"/>}/>;
+const XIcon  = p => <Ic {...p} ch={<path d="M18 6 6 18M6 6l12 12"/>}/>;
+const BellI  = p => <Ic {...p} ch={<><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></>}/>;
+const BellOffI=p => <Ic {...p} ch={<><path d="m13.73 21a2 2 0 0 1-3.46 0"/><path d="M18.63 13A17.9 17.9 0 0 1 18 8"/><path d="M6.26 6.26A5.86 5.86 0 0 0 6 8c0 7-3 9-3 9h14"/><path d="M18 8a6 6 0 0 0-9.33-5"/><line x1="2" y1="2" x2="22" y2="22"/></>}/>;
 
 function getNavItems(role) {
   const all = [
@@ -69,11 +71,83 @@ function AlertToast({ alerts, onDismiss }) {
 
 // ── Main dashboard ─────────────────────────────────────────────────────────────
 export default function RoadstarDashboard({ onLogout }) {
-  const [theme,   setTheme]   = useState(getTheme());
-  const [page,    setPage]    = useState("today");
-  const [drawer,  setDrawer]  = useState(false);
-  const [alerts,  setAlerts]  = useState([]);
-  const alertId = useRef(0);
+  const [theme,          setTheme]          = useState(getTheme());
+  const [page,           setPage]           = useState("today");
+  const [drawer,         setDrawer]         = useState(false);
+  const [alerts,         setAlerts]         = useState([]);
+  const [pendingCount,   setPendingCount]   = useState(0);
+  const [newBanners,     setNewBanners]     = useState([]); // { id, booking }
+  const [soundMuted,     setSoundMuted]     = useState(() => localStorage.getItem("rs_muted") === "1");
+  const alertId       = useRef(0);
+  const bannerId      = useRef(0);
+  const knownPending  = useRef(null); // null = first load (don't alert)
+  const soundMutedRef = useRef(soundMuted);
+  useEffect(() => { soundMutedRef.current = soundMuted; }, [soundMuted]);
+
+  // ── Unlock Web Audio on first tap/click (browser autoplay policy) ─────────
+  useEffect(() => {
+    const unlock = () => {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        ctx.resume().then(() => ctx.close());
+      } catch {}
+    };
+    document.addEventListener("click",      unlock, { once: true });
+    document.addEventListener("touchstart", unlock, { once: true });
+  }, []);
+
+  // ── Play loud chime ────────────────────────────────────────────────────────
+  const playChime = useCallback(() => {
+    if (soundMutedRef.current) return;
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      ctx.resume().then(() => {
+        const beep = (freq, t0, dur) => {
+          const osc = ctx.createOscillator();
+          const g   = ctx.createGain();
+          osc.connect(g); g.connect(ctx.destination);
+          osc.type = "sine"; osc.frequency.value = freq;
+          g.gain.setValueAtTime(0, t0);
+          g.gain.linearRampToValueAtTime(1.0, t0 + 0.012);
+          g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+          osc.start(t0); osc.stop(t0 + dur + 0.05);
+        };
+        const n = ctx.currentTime;
+        beep(660,  n + 0.00, 0.14); beep(880,  n + 0.18, 0.14); beep(1100, n + 0.36, 0.28);
+        beep(660,  n + 0.72, 0.14); beep(880,  n + 0.90, 0.14); beep(1100, n + 1.08, 0.28);
+        setTimeout(() => { try { ctx.close(); } catch {} }, 2500);
+      });
+    } catch {}
+  }, []);
+
+  // ── Global polling — detects new pending bookings on ANY page ─────────────
+  useEffect(() => {
+    const today = todayStr();
+    const poll = async () => {
+      try {
+        const bk   = await fetchBookings({ date: today });
+        const list = bk || [];
+        const pending = list.filter(b => b.status === "pending");
+        setPendingCount(pending.length);
+        if (knownPending.current !== null) {
+          const brandNew = pending.filter(b => !knownPending.current.has(b.id));
+          if (brandNew.length > 0) {
+            playChime();
+            brandNew.forEach(b => {
+              const bid = ++bannerId.current;
+              setNewBanners(q => [...q, { id: bid, booking: b }]);
+              // Auto-dismiss after 12 s
+              setTimeout(() => setNewBanners(q => q.filter(x => x.id !== bid)), 12000);
+            });
+          }
+        }
+        knownPending.current = new Set(pending.map(b => b.id));
+      } catch {}
+    };
+    poll();
+    const iv = setInterval(poll, 30000);
+    return () => clearInterval(iv);
+  }, [playChime]);
 
   const role = getUserRole() || "owner";
   const name = getUserName() || "Admin";
@@ -90,6 +164,12 @@ export default function RoadstarDashboard({ onLogout }) {
     setAlerts(p => [...p, { id, msg, type }]);
     setTimeout(() => setAlerts(p => p.filter(a => a.id !== id)), 4000);
   }, []);
+
+  const toggleMute = () => {
+    const next = !soundMuted;
+    setSoundMuted(next);
+    localStorage.setItem("rs_muted", next ? "1" : "0");
+  };
 
   const handleTheme = () => {
     const next = toggleTheme();
@@ -123,6 +203,7 @@ export default function RoadstarDashboard({ onLogout }) {
   function NavItem({ id, label, Icon }) {
     const active = page === id;
     const [h, setH] = useState(false);
+    const showBadge = id === "today" && pendingCount > 0;
     return (
       <button onClick={() => navigate(id)}
         onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
@@ -132,8 +213,62 @@ export default function RoadstarDashboard({ onLogout }) {
           cursor:"pointer", textAlign:"left", color:active?T.blueBright:h?T.textPrimary:T.textSecond,
           transition:"all .12s", marginBottom:2 }}>
         <Icon s={15} c={active?T.blue:h?T.textPrimary:T.textMuted}/>
-        <span style={{ fontSize:13, fontWeight:active?600:400, fontFamily:T.font }}>{label}</span>
+        <span style={{ fontSize:13, fontWeight:active?600:400, fontFamily:T.font, flex:1 }}>{label}</span>
+        {showBadge && (
+          <span style={{ fontSize:10, fontWeight:700, background:T.amber, color:"#000",
+            padding:"1px 6px", borderRadius:20, minWidth:18, textAlign:"center", flexShrink:0 }}>
+            {pendingCount}
+          </span>
+        )}
       </button>
+    );
+  }
+
+  // ── New Booking Banner ─────────────────────────────────────────────────────
+  function NewBookingBanner() {
+    if (!newBanners.length) return null;
+    return (
+      <div style={{ position:"fixed", top:16, right:16, zIndex:9998, display:"flex",
+        flexDirection:"column", gap:8, maxWidth:340, pointerEvents:"none" }}>
+        {newBanners.map(({ id, booking: b }) => (
+          <div key={id} style={{ display:"flex", alignItems:"stretch", gap:0,
+            background: theme==="dark" ? "#0f1e35" : "#eef6ff",
+            border:`1px solid ${T.blue}50`, borderLeft:`4px solid ${T.blue}`,
+            borderRadius:T.r10, boxShadow:"0 6px 32px rgba(0,0,0,.45)",
+            animation:"rs-slide-in .22s ease-out", pointerEvents:"auto", overflow:"hidden" }}>
+            {/* Left content */}
+            <div style={{ flex:1, padding:"11px 12px", minWidth:0 }}>
+              <div style={{ display:"flex", alignItems:"center", gap:5, marginBottom:4 }}>
+                <BellI s={12} c={T.blue}/>
+                <span style={{ fontSize:10, fontWeight:800, color:T.blue,
+                  textTransform:"uppercase", letterSpacing:"0.07em" }}>New Booking</span>
+              </div>
+              <div style={{ fontSize:13, fontWeight:700, color:T.textPrimary,
+                overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                {b.customerName || b.customer_name || "New Customer"}
+              </div>
+              <div style={{ fontSize:11, color:T.textSecond, marginTop:2,
+                overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                {[b.service, b.time].filter(Boolean).join(" · ") || "Pending approval"}
+              </div>
+            </div>
+            {/* Right buttons */}
+            <div style={{ display:"flex", flexDirection:"column", borderLeft:`1px solid ${T.border}`, flexShrink:0 }}>
+              <button onClick={() => { navigate("today"); setNewBanners(q => q.filter(x => x.id !== id)); }}
+                style={{ flex:1, padding:"0 14px", background:T.blue, color:"#fff",
+                  border:"none", cursor:"pointer", fontSize:11, fontWeight:700,
+                  borderBottom:`1px solid rgba(255,255,255,.15)` }}>
+                View
+              </button>
+              <button onClick={() => setNewBanners(q => q.filter(x => x.id !== id))}
+                style={{ flex:1, padding:"0 14px", background:"transparent", color:T.textMuted,
+                  border:"none", cursor:"pointer", fontSize:11 }}>
+                Dismiss
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
     );
   }
 
@@ -183,6 +318,14 @@ export default function RoadstarDashboard({ onLogout }) {
             fontSize:12, cursor:"pointer", fontFamily:T.font, marginBottom:4 }}>
             {theme==="dark" ? <SunI s={13} c={T.amber}/> : <MooI s={13} c={T.blue}/>}
             {theme==="dark" ? "Light mode" : "Dark mode"}
+          </button>
+          {/* Mute alerts */}
+          <button onClick={toggleMute} style={{ display:"flex", alignItems:"center", gap:8, width:"100%", padding:"7px 10px",
+            border:`1px solid ${T.border}`, borderRadius:T.r8, background:"transparent",
+            color: soundMuted ? T.textMuted : T.textSecond,
+            fontSize:12, cursor:"pointer", fontFamily:T.font, marginBottom:4 }}>
+            {soundMuted ? <BellOffI s={13} c={T.textMuted}/> : <BellI s={13} c={T.blue}/>}
+            {soundMuted ? "Unmute alerts" : "Mute alerts"}
           </button>
           {/* Logout */}
           <button onClick={onLogout} style={{ display:"flex", alignItems:"center", gap:8, width:"100%", padding:"7px 10px",
@@ -272,8 +415,13 @@ export default function RoadstarDashboard({ onLogout }) {
           .rs-topbar { display: none !important; }
           .rs-drawer-overlay { display: none !important; }
         }
+        @keyframes rs-slide-in {
+          from { opacity: 0; transform: translateX(60px) scale(.95); }
+          to   { opacity: 1; transform: translateX(0)    scale(1);   }
+        }
       `}</style>
 
+      <NewBookingBanner/>
       <AlertToast alerts={alerts} onDismiss={id => setAlerts(p => p.filter(a => a.id !== id))}/>
     </div>
   );
