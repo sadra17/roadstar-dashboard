@@ -109,7 +109,7 @@ export default function LiveBayPage({ onAlert }) {
                       <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
                         <Btn small variant="teal" icon={<FlagIcon size={12} color={T.teal}/>} onClick={() => setCompleteB(b)} disabled={busy[b.id]}>Done</Btn>
                         <Btn small variant="amber" icon={<ClockIcon size={12} color={T.amber}/>} onClick={() => handleExtend(b.id, 10)} disabled={busy[b.id]}>+10 min</Btn>
-                        <Btn small variant="ghost" icon={<WrenchIcon size={12}/>} onClick={() => setNoteB(b)}>Note</Btn>
+                        {isMechanic && <Btn small variant="ghost" icon={<WrenchIcon size={12}/>} onClick={() => setNoteB(b)}>Note</Btn>}
                         {(isOver || isSoon) && (
                           <Btn small variant="ghost" onClick={() => baySnooze(b.id).then(() => load(true))}>Snooze</Btn>
                         )}

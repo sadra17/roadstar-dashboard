@@ -1,6 +1,6 @@
 // pages/TodayPage.jsx — no emoji, SVG icons throughout
 import { useState, useEffect, useCallback } from "react";
-import { fetchBookings, fetchLiveBay, updateBooking, baySnooze, extendBay } from "../api.js";
+import { fetchBookings, fetchLiveBay, updateBooking, baySnooze, extendBay, getUserRole } from "../api.js";
 import { getT, sm, displaySvc, effectiveOcc, todayStr } from "../theme.js";
 import { Badge, Btn, IBtn, Modal, ModalTitle, Sel, Inp, StatCard, PageHeader, Spinner, CheckIcon, XIcon, FlagIcon, ClockIcon, BayIcon, RefreshIcon, PlusIcon, ConfirmModal, TrashIcon } from "../components.jsx";
 
@@ -85,7 +85,7 @@ function LiveCard({ b, onComplete, onSnooze, onExtend }) {
   );
 }
 
-function QueueRow({ b, onConfirm, onCancel, onComplete }) {
+function QueueRow({ b, onConfirm, onCancel, onComplete, readOnly }) {
   const T = getT();
   const s = sm(b.status);
   const [busy, setBusy] = useState(false);
@@ -105,17 +105,20 @@ function QueueRow({ b, onConfirm, onCancel, onComplete }) {
         {b.phone && <div style={{ fontSize:10, color:T.textMuted, marginTop:1 }}>{b.phone}</div>}
       </div>
       <Badge status={b.status}/>
-      <div style={{ display:"flex", gap:3 }}>
-        {!["confirmed","completed","cancelled"].includes(b.status) && (
-          <IBtn v="accept" title="Confirm" onClick={() => act(() => onConfirm(b.id))} disabled={busy}><CheckIcon size={14}/></IBtn>
-        )}
-        {!["completed","cancelled"].includes(b.status) && (
-          <IBtn v="complete" title="Mark Complete" onClick={() => onComplete(b)} disabled={busy}><FlagIcon size={14}/></IBtn>
-        )}
-        {!["cancelled","completed"].includes(b.status) && (
-          <IBtn v="decline" title="Cancel" onClick={() => onCancel(b)} disabled={busy}><XIcon size={14}/></IBtn>
-        )}
-      </div>
+      {/* Mechanics are view-only on Today — all booking actions are for frontdesk/owner */}
+      {!readOnly && (
+        <div style={{ display:"flex", gap:3 }}>
+          {!["confirmed","completed","cancelled"].includes(b.status) && (
+            <IBtn v="accept" title="Confirm" onClick={() => act(() => onConfirm(b.id))} disabled={busy}><CheckIcon size={14}/></IBtn>
+          )}
+          {!["completed","cancelled"].includes(b.status) && (
+            <IBtn v="complete" title="Mark Complete" onClick={() => onComplete(b)} disabled={busy}><FlagIcon size={14}/></IBtn>
+          )}
+          {!["cancelled","completed"].includes(b.status) && (
+            <IBtn v="decline" title="Cancel" onClick={() => onCancel(b)} disabled={busy}><XIcon size={14}/></IBtn>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -191,6 +194,7 @@ function WalkInModal({ onClose, onSave }) {
 export default function TodayPage({ onAlert }) {
   const T = getT();
   const today = todayStr();
+  const isMechanic = getUserRole() === "mechanic";
   const [bookings,  setBookings]  = useState([]);
   const [liveBay,   setLiveBay]   = useState({ active:[], upcoming:[] });
   const [loading,   setLoading]   = useState(true);
@@ -243,7 +247,7 @@ export default function TodayPage({ onAlert }) {
         title="Today"
         sub={dateDisplay}
         actions={<>
-          <Btn small icon={<PlusIcon size={13} color="#fff"/>} onClick={() => setShowWalkIn(true)}>Walk-in</Btn>
+          {!isMechanic && <Btn small icon={<PlusIcon size={13} color="#fff"/>} onClick={() => setShowWalkIn(true)}>Walk-in</Btn>}
           <Btn small variant="ghost" icon={<RefreshIcon size={13}/>} onClick={() => load()}>Refresh</Btn>
         </>}
       />
@@ -299,6 +303,7 @@ export default function TodayPage({ onAlert }) {
         <div style={{ display:"flex", flexDirection:"column", gap:7 }}>
           {[...active].sort((a,b) => a.time.localeCompare(b.time)).map(b => (
             <QueueRow key={b.id} b={b}
+              readOnly={isMechanic}
               onConfirm={id => act(id, { status:"confirmed" }).then(() => onAlert?.("Confirmed"))}
               onCancel={b => setCancelB(b)}
               onComplete={setCompleteB}
