@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { fetchBookings, fetchLiveBay, updateBooking, baySnooze, extendBay } from "../api.js";
 import { getT, sm, displaySvc, effectiveOcc, todayStr } from "../theme.js";
-import { Badge, Btn, IBtn, Modal, ModalTitle, Sel, Inp, StatCard, PageHeader, Spinner, CheckIcon, XIcon, FlagIcon, ClockIcon, BayIcon, RefreshIcon, PlusIcon } from "../components.jsx";
+import { Badge, Btn, IBtn, Modal, ModalTitle, Sel, Inp, StatCard, PageHeader, Spinner, CheckIcon, XIcon, FlagIcon, ClockIcon, BayIcon, RefreshIcon, PlusIcon, ConfirmModal, TrashIcon } from "../components.jsx";
 
 // ── Loud notification sound (Web Audio API — no file needed) ──────────────────
 function playNewBookingAlert() {
@@ -148,7 +148,7 @@ function QueueRow({ b, onConfirm, onCancel, onComplete }) {
           <IBtn v="complete" title="Mark Complete" onClick={() => onComplete(b)} disabled={busy}><FlagIcon size={14}/></IBtn>
         )}
         {!["cancelled","completed"].includes(b.status) && (
-          <IBtn v="decline" title="Cancel" onClick={() => act(() => onCancel(b.id))} disabled={busy}><XIcon size={14}/></IBtn>
+          <IBtn v="decline" title="Cancel" onClick={() => onCancel(b)} disabled={busy}><XIcon size={14}/></IBtn>
         )}
       </div>
     </div>
@@ -229,8 +229,9 @@ export default function TodayPage({ onAlert }) {
   const [bookings,  setBookings]  = useState([]);
   const [liveBay,   setLiveBay]   = useState({ active:[], upcoming:[] });
   const [loading,   setLoading]   = useState(true);
-  const [completeB, setCompleteB] = useState(null);
+  const [completeB,  setCompleteB]  = useState(null);
   const [showWalkIn, setShowWalkIn] = useState(false);
+  const [cancelB,    setCancelB]    = useState(null); // booking to confirm cancel
 
   // Track known pending IDs to detect new arrivals and play sound
   const knownPendingIds = useRef(null); // null = initial load (don't beep)
@@ -349,7 +350,7 @@ export default function TodayPage({ onAlert }) {
           {[...active].sort((a,b) => a.time.localeCompare(b.time)).map(b => (
             <QueueRow key={b.id} b={b}
               onConfirm={id => act(id, { status:"confirmed" }).then(() => onAlert?.("Confirmed"))}
-              onCancel={id => act(id, { status:"cancelled" }).then(() => onAlert?.("Cancelled"))}
+              onCancel={b => setCancelB(b)}
               onComplete={setCompleteB}
             />
           ))}
@@ -388,6 +389,23 @@ export default function TodayPage({ onAlert }) {
             ))}
           </div>
         </Modal>
+      )}
+
+      {/* Cancel booking confirmation */}
+      {cancelB && (
+        <ConfirmModal
+          title={`Cancel ${cancelB.firstName}'s booking?`}
+          message={`${cancelB.service} on ${cancelB.date} at ${cancelB.time} will be cancelled. An SMS will NOT be sent automatically.`}
+          confirmLabel="Yes, cancel booking"
+          confirmVariant="danger"
+          icon={<XIcon size={22} color={T.red}/>}
+          onConfirm={async () => {
+            await act(cancelB.id, { status:"cancelled" });
+            onAlert?.("Booking cancelled");
+            setCancelB(null);
+          }}
+          onCancel={() => setCancelB(null)}
+        />
       )}
     </div>
   );

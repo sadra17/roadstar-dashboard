@@ -202,3 +202,36 @@ export const RestoreIcon = p => <Ic {...p}><path d="M3 12a9 9 0 1 0 9-9 9.75 9.7
 export const BellIcon    = p => <Ic {...p}><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></Ic>;
 export const NoteIcon    = p => <Ic {...p}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></Ic>;
 export const WalkInIcon  = p => <Ic {...p}><circle cx="12" cy="5" r="2"/><path d="m15 14-3-6-3 6"/><path d="M9 11H7l-2 6"/><path d="m17 11 2 6"/></Ic>;
+export const AlertCircleIcon = p => <Ic {...p}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></Ic>;
+
+// ── Confirmation modal (reusable for any destructive action) ──────────────────
+// Usage: <ConfirmModal title="Delete user?" message="This cannot be undone."
+//          confirmLabel="Yes, delete" confirmVariant="danger"
+//          icon={<TrashIcon size={22} color={T.red}/>}
+//          onConfirm={handleDelete} onCancel={() => setTarget(null)} />
+export function ConfirmModal({ title, message, confirmLabel = "Yes, proceed", confirmVariant = "danger", icon, onConfirm, onCancel, busy = false }) {
+  const T = getT();
+  const iconBg    = confirmVariant === "danger"  ? T.redBg    : confirmVariant === "amber" ? T.amberBg  : T.greenBg;
+  const iconBd    = confirmVariant === "danger"  ? T.redBorder: confirmVariant === "amber" ? T.amberBorder : T.greenBorder;
+  return (
+    <Modal onClose={onCancel}>
+      <div style={{ textAlign:"center", padding:"8px 0 16px" }}>
+        {icon && (
+          <div style={{ width:56, height:56, borderRadius:"50%", background:iconBg, border:`2px solid ${iconBd}`, display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 18px" }}>
+            {icon}
+          </div>
+        )}
+        <div style={{ fontSize:17, fontWeight:700, color:T.textPrimary, marginBottom:8, lineHeight:1.3 }}>{title}</div>
+        {message && (
+          <div style={{ fontSize:13, color:T.textMuted, marginBottom:24, lineHeight:1.65, maxWidth:340, margin:"0 auto 24px" }}>{message}</div>
+        )}
+        <div style={{ display:"flex", gap:10, justifyContent:"center" }}>
+          <Btn variant={confirmVariant} onClick={onConfirm} disabled={busy}>
+            {busy ? "Working…" : confirmLabel}
+          </Btn>
+          <Btn variant="ghost" onClick={onCancel} disabled={busy}>Cancel</Btn>
+        </div>
+      </div>
+    </Modal>
+  );
+}

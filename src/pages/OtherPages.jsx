@@ -74,16 +74,18 @@ export function AuditLogPage({ onAlert }) {
 // pages/UsersPage.jsx
 // ─────────────────────────────────────────────────────────────────────────────
 import { fetchUsers, createUser, updateUser, deleteUser, resetPassword } from "../api.js";
-import { Btn, IBtn, Modal, ModalTitle, Inp, Sel, Badge as BadgeComp } from "../components.jsx";
+import { Btn, IBtn, Modal, ModalTitle, Inp, Sel, Badge as BadgeComp, ConfirmModal, TrashIcon as TrashIconC } from "../components.jsx";
 import { CheckIcon, XIcon, PenIcon, TrashIcon, PlusIcon } from "../components.jsx";
 
 export function UsersPage({ onAlert }) {
   const T = getT();
-  const [users,   setUsers]   = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [modal,   setModal]   = useState(null); // null | "create" | user object (edit)
-  const [form,    setForm]    = useState({ name:"", email:"", password:"", role:"frontdesk" });
-  const [busy,    setBusy]    = useState(false);
+  const [users,       setUsers]       = useState([]);
+  const [loading,     setLoading]     = useState(true);
+  const [modal,       setModal]       = useState(null); // null | "create" | user object (edit)
+  const [form,        setForm]        = useState({ name:"", email:"", password:"", role:"frontdesk" });
+  const [busy,        setBusy]        = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null); // user object to confirm delete
+  const [deleteBusy,   setDeleteBusy]   = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -132,7 +134,7 @@ export function UsersPage({ onAlert }) {
               {!u.active && <span style={{ fontSize:10, color:T.textMuted, background:T.elevated, padding:"2px 8px", borderRadius:20, border:`1px solid ${T.border}` }}>Inactive</span>}
               <div style={{ display:"flex", gap:3 }}>
                 <IBtn v="edit" title="Edit" onClick={() => { setForm({name:u.name,email:u.email,password:"",role:u.role,active:u.active!==false}); setModal(u); }}><PenIcon size={14}/></IBtn>
-                <IBtn v="trash" title="Deactivate" onClick={async () => { try { await deleteUser(u.id); onAlert?.("User deactivated"); load(); } catch(e) { onAlert?.(e.message,"error"); } }}><TrashIcon size={14}/></IBtn>
+                <IBtn v="trash" title="Deactivate" onClick={() => setDeleteTarget(u)}><TrashIcon size={14}/></IBtn>
               </div>
             </div>
           ))}
@@ -163,6 +165,25 @@ export function UsersPage({ onAlert }) {
           </div>
         </Modal>
       )}
+
+      {/* Delete user confirmation */}
+      {deleteTarget && (
+        <ConfirmModal
+          title={`Deactivate ${deleteTarget.name}?`}
+          message={`This will disable ${deleteTarget.email}'s access immediately. You can re-activate them later by editing the account.`}
+          confirmLabel="Yes, deactivate"
+          confirmVariant="danger"
+          icon={<TrashIcon size={22} color={T.red}/>}
+          busy={deleteBusy}
+          onConfirm={async () => {
+            setDeleteBusy(true);
+            try { await deleteUser(deleteTarget.id); onAlert?.("User deactivated"); setDeleteTarget(null); load(); }
+            catch (e) { onAlert?.(e.message,"error"); }
+            finally { setDeleteBusy(false); }
+          }}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
     </div>
   );
 }
@@ -171,15 +192,16 @@ export function UsersPage({ onAlert }) {
 // pages/AdminPage.jsx — Super Admin only
 // ─────────────────────────────────────────────────────────────────────────────
 import { fetchShops, createShop, updateShop } from "../api.js";
-import { ShopIcon } from "../components.jsx";
+import { ShopIcon, ConfirmModal as ConfirmModal2 } from "../components.jsx";
 
 export function AdminPage({ onAlert }) {
   const T = getT();
-  const [shops,   setShops]   = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [modal,   setModal]   = useState(false);
-  const [form,    setForm]    = useState({ shopId:"", name:"", ownerEmail:"", ownerName:"", ownerPassword:"", plan:"trial" });
-  const [busy,    setBusy]    = useState(false);
+  const [shops,        setShops]        = useState([]);
+  const [loading,      setLoading]      = useState(true);
+  const [modal,        setModal]        = useState(false);
+  const [form,         setForm]         = useState({ shopId:"", name:"", ownerEmail:"", ownerName:"", ownerPassword:"", plan:"trial" });
+  const [busy,         setBusy]         = useState(false);
+  const [shopConfirm,  setShopConfirm]  = useState(null); // { shop, action:"pause"|"activate" }
 
   const load = () => {
     setLoading(true);
@@ -218,9 +240,9 @@ export function AdminPage({ onAlert }) {
               </div>
               <div style={{ display:"flex", gap:6, marginTop:10 }}>
                 {s.active ? (
-                  <Btn small variant="danger" onClick={async () => { try { await updateShop(s.shopId,{active:false,plan:"paused"}); onAlert?.("Shop paused"); load(); } catch(e) { onAlert?.(e.message,"error"); } }}>Pause</Btn>
+                  <Btn small variant="danger" onClick={() => setShopConfirm({ shop:s, action:"pause" })}>Pause</Btn>
                 ) : (
-                  <Btn small variant="success" onClick={async () => { try { await updateShop(s.shopId,{active:true,plan:"active"}); onAlert?.("Shop activated"); load(); } catch(e) { onAlert?.(e.message,"error"); } }}>Activate</Btn>
+                  <Btn small variant="success" onClick={() => setShopConfirm({ shop:s, action:"activate" })}>Activate</Btn>
                 )}
               </div>
             </div>
@@ -246,6 +268,26 @@ export function AdminPage({ onAlert }) {
             <Btn variant="ghost" onClick={() => setModal(false)}>Cancel</Btn>
           </div>
         </Modal>
+      )}
+
+      {shopConfirm && (
+        <ConfirmModal2
+          title={shopConfirm.action === "pause" ? `Pause ${shopConfirm.shop.name}?` : `Activate ${shopConfirm.shop.name}?`}
+          message={shopConfirm.action === "pause"
+            ? "This will prevent the shop owner from logging in and disable their booking form."
+            : "This will restore the shop owner's access and re-enable their booking form."}
+          confirmLabel={shopConfirm.action === "pause" ? "Yes, pause shop" : "Yes, activate shop"}
+          confirmVariant={shopConfirm.action === "pause" ? "danger" : "success"}
+          onConfirm={async () => {
+            try {
+              const updates = shopConfirm.action === "pause" ? { active:false, plan:"paused" } : { active:true, plan:"active" };
+              await updateShop(shopConfirm.shop.shopId, updates);
+              onAlert?.(shopConfirm.action === "pause" ? "Shop paused" : "Shop activated");
+              setShopConfirm(null); load();
+            } catch(e) { onAlert?.(e.message,"error"); }
+          }}
+          onCancel={() => setShopConfirm(null)}
+        />
       )}
     </div>
   );
