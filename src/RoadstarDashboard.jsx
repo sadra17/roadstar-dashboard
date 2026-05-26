@@ -2,6 +2,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { getT, getTheme, toggleTheme, DARK, LIGHT } from "./theme.js";
 import { getUserRole, getUserName } from "./api.js";
+
+const SHOP_LABEL = (import.meta.env.VITE_SHOP_NAME || "Roadstar Tire").toUpperCase();
 import SettingsPage from "./SettingsPage.jsx";
 import TodayPage from "./pages/TodayPage.jsx";
 import BookingsPage from "./pages/BookingsPage.jsx";
@@ -150,8 +152,8 @@ export default function RoadstarDashboard({ onLogout }) {
               </svg>
             </div>
             <div>
-              <div style={{ fontSize:13, fontWeight:800, color:T.textPrimary, letterSpacing:"0.04em" }}>ROADSTAR</div>
-              <div style={{ fontSize:10, color:T.textMuted, letterSpacing:"0.1em" }}>TIRE ADMIN</div>
+              <div style={{ fontSize:13, fontWeight:800, color:T.textPrimary, letterSpacing:"0.04em" }}>{SHOP_LABEL}</div>
+              <div style={{ fontSize:10, color:T.textMuted, letterSpacing:"0.1em" }}>ADMIN DASHBOARD</div>
             </div>
           </div>
         </div>

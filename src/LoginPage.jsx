@@ -277,6 +277,9 @@ export default function LoginPage({ onLogin }) {
         <div style={{ fontSize:11, color:T.textMuted, textAlign:"center", marginTop:20 }}>
           Protected admin access · {SHOP_NAME}
         </div>
+        <div style={{ fontSize:10, color:T.textMuted, textAlign:"center", marginTop:8, opacity:0.5, letterSpacing:"0.05em" }}>
+          Built by Social Aura
+        </div>
       </div>
     </div>
   );
