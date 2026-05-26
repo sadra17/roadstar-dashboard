@@ -226,7 +226,7 @@ function StepPassword({ onSuccess, onUseOtp }) {
       <Divider />
       <button type="button" onClick={onUseOtp}
         style={{ ...btn(false,"ghost"), marginTop:0, fontSize:13, color:T.textMuted }}>
-        ← Login with email code instead
+        Use email login code instead →
       </button>
     </form>
   );
@@ -256,8 +256,8 @@ function Divider() {
 
 // ── Main export ───────────────────────────────────────────────────────────────
 export default function LoginPage({ onLogin }) {
-  // "otp-email" → "otp-code" → logged in  |  "password" → logged in
-  const [step,  setStep]  = useState("otp-email"); // "otp-email" | "otp-code" | "password"
+  // "password" → logged in  |  "otp-email" → "otp-code" → logged in
+  const [step,  setStep]  = useState("password"); // "password" | "otp-email" | "otp-code"
   const [email, setEmail] = useState("");
 
   const handleSent    = (e)  => { setEmail(e); setStep("otp-code"); };
@@ -271,9 +271,9 @@ export default function LoginPage({ onLogin }) {
         background:T.card, border:`1px solid ${T.borderVis}`,
         borderRadius:20, padding:36, boxShadow:"0 8px 40px rgba(0,0,0,0.6)" }}>
         <Logo />
+        {step === "password"   && <StepPassword onSuccess={handleSuccess} onUseOtp={() => setStep("otp-email")} />}
         {step === "otp-email"  && <StepEmail   onSent={handleSent}    onUsePassword={() => setStep("password")} />}
         {step === "otp-code"   && <StepCode    email={email} onSuccess={handleSuccess} onBack={handleBack} />}
-        {step === "password"   && <StepPassword onSuccess={handleSuccess} onUseOtp={() => setStep("otp-email")} />}
         <div style={{ fontSize:11, color:T.textMuted, textAlign:"center", marginTop:20 }}>
           Protected admin access · {SHOP_NAME}
         </div>

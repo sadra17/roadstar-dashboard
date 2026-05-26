@@ -1,5 +1,41 @@
 // pages/TodayPage.jsx — no emoji, SVG icons throughout
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+
+// ── Loud notification sound (Web Audio API — no file needed) ──────────────────
+function playNewBookingAlert() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const master = ctx.createGain();
+    master.gain.value = 1.0;
+    master.connect(ctx.destination);
+
+    const beep = (freq, startSec, durSec) => {
+      const osc  = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(master);
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      const t0 = ctx.currentTime + startSec;
+      gain.gain.setValueAtTime(0,   t0);
+      gain.gain.linearRampToValueAtTime(1.0, t0 + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.001, t0 + durSec);
+      osc.start(t0);
+      osc.stop(t0 + durSec + 0.05);
+    };
+
+    // Three-tone chime: low → mid → high
+    beep(660,  0.00, 0.14);
+    beep(880,  0.18, 0.14);
+    beep(1100, 0.36, 0.28);
+    // Repeat once for extra volume
+    beep(660,  0.72, 0.14);
+    beep(880,  0.90, 0.14);
+    beep(1100, 1.08, 0.28);
+
+    setTimeout(() => { try { ctx.close(); } catch {} }, 2500);
+  } catch (_) { /* browser blocked audio or not supported */ }
+}
 import { fetchBookings, fetchLiveBay, updateBooking, baySnooze, extendBay } from "../api.js";
 import { getT, sm, displaySvc, effectiveOcc, todayStr } from "../theme.js";
 import { Badge, Btn, IBtn, Modal, ModalTitle, Sel, Inp, StatCard, PageHeader, Spinner, CheckIcon, XIcon, FlagIcon, ClockIcon, BayIcon, RefreshIcon, PlusIcon } from "../components.jsx";
@@ -197,12 +233,27 @@ export default function TodayPage({ onAlert }) {
   const [completeB, setCompleteB] = useState(null);
   const [showWalkIn, setShowWalkIn] = useState(false);
 
+  // Track known pending IDs to detect new arrivals and play sound
+  const knownPendingIds = useRef(null); // null = initial load (don't beep)
+
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
       const [bk, lb] = await Promise.all([fetchBookings({ date:today }), fetchLiveBay()]);
-      setBookings(bk || []);
+      const bookingList = bk || [];
+      setBookings(bookingList);
       setLiveBay(lb || { active:[], upcoming:[] });
+
+      // Sound alert: detect brand-new pending bookings
+      const pendingNow = bookingList.filter(b => b.status === "pending").map(b => b.id);
+      if (knownPendingIds.current !== null) {
+        const brandNew = pendingNow.filter(id => !knownPendingIds.current.has(id));
+        if (brandNew.length > 0) {
+          playNewBookingAlert();
+          onAlert?.(`${brandNew.length} new booking${brandNew.length > 1 ? "s" : ""} arrived!`, "info");
+        }
+      }
+      knownPendingIds.current = new Set(pendingNow);
     } catch (e) { onAlert?.(e.message, "error"); }
     finally { setLoading(false); }
   }, [today]);
