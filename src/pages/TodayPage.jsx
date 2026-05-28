@@ -1,8 +1,8 @@
 // pages/TodayPage.jsx — no emoji, SVG icons throughout
 import { useState, useEffect, useCallback } from "react";
-import { fetchBookings, fetchLiveBay, updateBooking, baySnooze, extendBay, getUserRole } from "../api.js";
+import { fetchBookings, fetchLiveBay, updateBooking, baySnooze, extendBay, getUserRole, fetchSettings, updateMechanic } from "../api.js";
 import { getT, sm, displaySvc, effectiveOcc, todayStr } from "../theme.js";
-import { Badge, Btn, IBtn, Modal, ModalTitle, Sel, Inp, StatCard, PageHeader, Spinner, CheckIcon, XIcon, FlagIcon, ClockIcon, BayIcon, RefreshIcon, PlusIcon, ConfirmModal, TrashIcon } from "../components.jsx";
+import { Badge, Btn, IBtn, Modal, ModalTitle, Sel, Inp, StatCard, PageHeader, Spinner, CheckIcon, XIcon, FlagIcon, ClockIcon, BayIcon, RefreshIcon, PlusIcon, ConfirmModal, TrashIcon, WrenchIcon } from "../components.jsx";
 
 // Walk-in uses POST /api/book directly (same as Shopify form)
 async function createWalkIn(form) {
@@ -85,38 +85,54 @@ function LiveCard({ b, onComplete, onSnooze, onExtend }) {
   );
 }
 
-function QueueRow({ b, onConfirm, onCancel, onComplete, readOnly }) {
+function QueueRow({ b, onConfirm, onCancel, onComplete, onNote, readOnly }) {
   const T = getT();
   const s = sm(b.status);
   const [busy, setBusy] = useState(false);
   const act = async (fn) => { setBusy(true); try { await fn(); } finally { setBusy(false); } };
   return (
-    <div style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 16px", background:T.cardBg, borderLeft:`3px solid ${s.color}`, border:`1px solid ${T.border}`, borderRadius:T.r10, opacity:busy?0.6:1 }}>
-      {/* Time block */}
-      <div style={{ flexShrink:0, minWidth:60, textAlign:"center", padding:"7px 10px", background:T.elevated, borderRadius:T.r8, border:`1px solid ${T.border}` }}>
-        <div style={{ fontSize:13, fontWeight:800, color:T.textPrimary, letterSpacing:"-0.02em" }}>{b.time}</div>
-        <div style={{ fontSize:9, color:T.textMuted, marginTop:1, fontVariantNumeric:"tabular-nums" }}>{effectiveOcc(b)}m</div>
-      </div>
-      {/* Info */}
-      <div style={{ flex:1, minWidth:0 }}>
-        <div style={{ fontSize:13, fontWeight:700, color:T.textPrimary, marginBottom:1 }}>{b.firstName} {b.lastName}</div>
-        <div style={{ fontSize:11, fontWeight:600, color:s.color, textTransform:"uppercase", letterSpacing:"0.04em", marginBottom:b.tireSize?2:0 }}>{displaySvc(b)}</div>
-        {b.tireSize && <div style={{ fontSize:10, color:T.textMuted, display:"flex", alignItems:"center", gap:4 }}><TireIcon size={10} color={T.textMuted}/>{b.tireSize}</div>}
-        {b.phone && <div style={{ fontSize:10, color:T.textMuted, marginTop:1 }}>{b.phone}</div>}
-      </div>
-      <Badge status={b.status}/>
-      {/* Mechanics are view-only on Today — all booking actions are for frontdesk/owner */}
-      {!readOnly && (
+    <div style={{ background:T.cardBg, borderLeft:`3px solid ${s.color}`, border:`1px solid ${T.border}`, borderRadius:T.r10, opacity:busy?0.6:1 }}>
+      <div style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 16px" }}>
+        {/* Time block */}
+        <div style={{ flexShrink:0, minWidth:60, textAlign:"center", padding:"7px 10px", background:T.elevated, borderRadius:T.r8, border:`1px solid ${T.border}` }}>
+          <div style={{ fontSize:13, fontWeight:800, color:T.textPrimary, letterSpacing:"-0.02em" }}>{b.time}</div>
+          <div style={{ fontSize:9, color:T.textMuted, marginTop:1, fontVariantNumeric:"tabular-nums" }}>{effectiveOcc(b)}m</div>
+        </div>
+        {/* Info */}
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ fontSize:13, fontWeight:700, color:T.textPrimary, marginBottom:1 }}>{b.firstName} {b.lastName}</div>
+          <div style={{ fontSize:11, fontWeight:600, color:s.color, textTransform:"uppercase", letterSpacing:"0.04em", marginBottom:b.tireSize?2:0 }}>{displaySvc(b)}</div>
+          {b.tireSize && <div style={{ fontSize:10, color:T.textMuted, display:"flex", alignItems:"center", gap:4 }}><TireIcon size={10} color={T.textMuted}/>{b.tireSize}</div>}
+          {b.phone && <div style={{ fontSize:10, color:T.textMuted, marginTop:1 }}>{b.phone}</div>}
+        </div>
+        <Badge status={b.status}/>
         <div style={{ display:"flex", gap:3 }}>
-          {!["confirmed","completed","cancelled"].includes(b.status) && (
-            <IBtn v="accept" title="Confirm" onClick={() => act(() => onConfirm(b.id))} disabled={busy}><CheckIcon size={14}/></IBtn>
+          {/* Mechanic: note button only — no booking actions */}
+          {readOnly && onNote && (
+            <IBtn v="ghost" title="Mechanic note" onClick={() => onNote(b)}><WrenchIcon size={14}/></IBtn>
           )}
-          {!["completed","cancelled"].includes(b.status) && (
-            <IBtn v="complete" title="Mark Complete" onClick={() => onComplete(b)} disabled={busy}><FlagIcon size={14}/></IBtn>
+          {/* Frontdesk / Owner: full booking actions */}
+          {!readOnly && (
+            <>
+              {!["confirmed","completed","cancelled"].includes(b.status) && (
+                <IBtn v="accept" title="Confirm" onClick={() => act(() => onConfirm(b.id))} disabled={busy}><CheckIcon size={14}/></IBtn>
+              )}
+              {!["completed","cancelled"].includes(b.status) && (
+                <IBtn v="complete" title="Mark Complete" onClick={() => onComplete(b)} disabled={busy}><FlagIcon size={14}/></IBtn>
+              )}
+              {!["cancelled","completed"].includes(b.status) && (
+                <IBtn v="decline" title="Cancel" onClick={() => onCancel(b)} disabled={busy}><XIcon size={14}/></IBtn>
+              )}
+            </>
           )}
-          {!["cancelled","completed"].includes(b.status) && (
-            <IBtn v="decline" title="Cancel" onClick={() => onCancel(b)} disabled={busy}><XIcon size={14}/></IBtn>
-          )}
+        </div>
+      </div>
+      {/* Mechanic notes — visible to all roles if set */}
+      {b.mechanicNotes && (
+        <div style={{ margin:"0 16px 10px", padding:"7px 10px", background:T.elevated, borderRadius:T.r8,
+          display:"flex", alignItems:"flex-start", gap:6, border:`1px solid ${T.border}` }}>
+          <WrenchIcon size={11} color={T.textMuted} style={{ flexShrink:0, marginTop:1 }}/>
+          <span style={{ fontSize:11, color:T.textSecond, lineHeight:1.5 }}>{b.mechanicNotes}</span>
         </div>
       )}
     </div>
@@ -125,10 +141,33 @@ function QueueRow({ b, onConfirm, onCancel, onComplete, readOnly }) {
 
 
 // ── Walk-in booking modal ─────────────────────────────────────────────────────
-const SERVICES_LIST = ["Tire Change + Installation","Flat Tire Repair","Tire Rotation","Wheel Alignment","Tire Purchase","Other"];
+// Default preset — replaced at runtime with live services from settings
+const DEFAULT_SERVICES = ["Tire Change + Installation","Flat Tire Repair","Tire Rotation","Wheel Alignment","Tire Purchase","Other"];
 const TIME_SLOTS_WI = ["9:00 AM","9:15 AM","9:30 AM","9:45 AM","10:00 AM","10:15 AM","10:30 AM","10:45 AM","11:00 AM","11:15 AM","11:30 AM","11:45 AM","12:00 PM","12:15 PM","12:30 PM","12:45 PM","1:00 PM","1:15 PM","1:30 PM","1:45 PM","2:00 PM","2:15 PM","2:30 PM","2:45 PM","3:00 PM","3:15 PM","3:30 PM","3:45 PM","4:00 PM","4:15 PM","4:30 PM","4:45 PM","5:00 PM","5:15 PM","5:30 PM","5:45 PM"];
 
-function WalkInModal({ onClose, onSave }) {
+// Mechanic note modal (used on Today page for mechanics)
+function MechanicNoteModal({ booking, onClose, onSave }) {
+  const T = getT();
+  const [note, setNote] = useState(booking.mechanicNotes || "");
+  const [busy, setBusy] = useState(false);
+  return (
+    <Modal onClose={onClose}>
+      <ModalTitle sub={`${booking.firstName} ${booking.lastName} — ${booking.service}`}>Mechanic Note</ModalTitle>
+      <textarea value={note} onChange={e => setNote(e.target.value)} rows={4}
+        placeholder="Add a note about this job…"
+        style={{ width:"100%", background:getT().pageBg, border:`1.5px solid ${getT().border}`,
+          borderRadius:getT().r8, padding:"10px 12px", color:getT().textPrimary,
+          fontSize:13, fontFamily:getT().font, outline:"none", boxSizing:"border-box", resize:"vertical" }}/>
+      <div style={{ display:"flex", gap:8, marginTop:12 }}>
+        <Btn onClick={async () => { setBusy(true); try { await onSave(booking.id, note); } finally { setBusy(false); } }}
+          disabled={busy} icon={<CheckIcon size={13} color="#fff"/>}>{busy ? "Saving…" : "Save Note"}</Btn>
+        <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
+      </div>
+    </Modal>
+  );
+}
+
+function WalkInModal({ onClose, onSave, services }) {
   const T = getT();
   const now = new Date();
   const defaultTime = TIME_SLOTS_WI.find(t => {
@@ -137,9 +176,10 @@ function WalkInModal({ onClose, onSave }) {
     return h24 * 60 + m >= now.getHours() * 60 + now.getMinutes();
   }) || "9:00 AM";
 
+  const svcList = services?.length ? services : DEFAULT_SERVICES;
   const [form, setForm] = useState({
     firstName:"", lastName:"", phone:"", email:"",
-    service:SERVICES_LIST[0], date:now.toISOString().slice(0,10), time:defaultTime,
+    service:svcList[0], date:now.toISOString().slice(0,10), time:defaultTime,
     tireSize:"", status:"confirmed",
   });
   const [busy, setBusy] = useState(false);
@@ -172,7 +212,7 @@ function WalkInModal({ onClose, onSave }) {
       </div>
       <div style={{ marginBottom:12 }}>
         <Lbl>Service</Lbl>
-        <Sel value={form.service} onChange={e=>sf("service",e.target.value)} options={SERVICES_LIST.map(s=>({value:s,label:s}))}/>
+        <Sel value={form.service} onChange={e=>sf("service",e.target.value)} options={svcList.map(s=>({value:s,label:s}))}/>
       </div>
       <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:12, marginBottom:12 }}>
         <div><Lbl>Date</Lbl><Inp type="date" value={form.date} onChange={e=>sf("date",e.target.value)} style={{colorScheme:"dark"}}/></div>
@@ -201,6 +241,18 @@ export default function TodayPage({ onAlert }) {
   const [completeB,  setCompleteB]  = useState(null);
   const [showWalkIn, setShowWalkIn] = useState(false);
   const [cancelB,    setCancelB]    = useState(null); // booking to confirm cancel
+  const [noteB,      setNoteB]      = useState(null); // mechanic note target
+  const [services,   setServices]   = useState([]);   // live services from settings
+
+  // Fetch live services once on mount (no permission gate — all roles can read settings)
+  useEffect(() => {
+    fetchSettings()
+      .then(s => {
+        const live = (s.services || []).filter(x => x.active !== false).map(x => x.name);
+        if (live.length > 0) setServices(live);
+      })
+      .catch(() => {}); // silently fall back to DEFAULT_SERVICES inside WalkInModal
+  }, []);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -304,6 +356,7 @@ export default function TodayPage({ onAlert }) {
           {[...active].sort((a,b) => a.time.localeCompare(b.time)).map(b => (
             <QueueRow key={b.id} b={b}
               readOnly={isMechanic}
+              onNote={isMechanic ? setNoteB : null}
               onConfirm={id => act(id, { status:"confirmed" }).then(() => onAlert?.("Confirmed"))}
               onCancel={b => setCancelB(b)}
               onComplete={setCompleteB}
@@ -312,15 +365,30 @@ export default function TodayPage({ onAlert }) {
         </div>
       )}
 
-      {/* Walk-in modal */}
+      {/* Walk-in modal — services come from live shop settings */}
       {showWalkIn && (
         <WalkInModal
+          services={services}
           onClose={() => setShowWalkIn(false)}
           onSave={async (form) => {
-            const data = await createWalkIn(form);
+            await createWalkIn(form);
             onAlert?.("Walk-in booking created");
             setShowWalkIn(false);
             load();
+          }}
+        />
+      )}
+
+      {/* Mechanic note modal */}
+      {noteB && (
+        <MechanicNoteModal
+          booking={noteB}
+          onClose={() => setNoteB(null)}
+          onSave={async (id, note) => {
+            await updateMechanic(id, { mechanicNotes: note });
+            onAlert?.("Note saved");
+            setNoteB(null);
+            load(true);
           }}
         />
       )}
