@@ -68,9 +68,11 @@ export default function AnalyticsPage({ onAlert }) {
   const [loading,  setLoading]  = useState(true);
 
   useEffect(() => {
-    const from = new Date();
-    from.setDate(from.getDate() - parseInt(period));
-    const params = { from: from.toISOString().slice(0,10), to: new Date().toISOString().slice(0,10) };
+    const today = new Date().toISOString().slice(0,10);
+    const from  = period === "0" ? today : (() => {
+      const d = new Date(); d.setDate(d.getDate() - parseInt(period)); return d.toISOString().slice(0,10);
+    })();
+    const params = { from, to: today };
     setLoading(true);
     Promise.all([
       fetchAnalyticsSummary(params),
@@ -83,6 +85,7 @@ export default function AnalyticsPage({ onAlert }) {
   }, [period]);
 
   const PERIOD_OPTIONS = [
+    { value:"0",   label:"Today" },
     { value:"7",   label:"Last 7 days" },
     { value:"30",  label:"Last 30 days" },
     { value:"90",  label:"Last 90 days" },

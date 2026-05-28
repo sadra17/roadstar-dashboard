@@ -1,6 +1,6 @@
 // pages/BookingsPage.jsx
 import { useState, useEffect, useCallback } from "react";
-import { fetchBookings, fetchRecentlyDeleted, updateBooking, deleteBooking, restoreBooking, sendSMS, updatePayment } from "../api.js";
+import { fetchBookings, fetchRecentlyDeleted, updateBooking, deleteBooking, restoreBooking, sendSMS, updatePayment, getUserRole } from "../api.js";
 import { getT, sm, displaySvc, effectiveOcc, fmtDate, todayStr } from "../theme.js";
 import { Badge, Btn, IBtn, Modal, ModalTitle, Inp, Sel, PageHeader, Spinner, Empty, Card, SearchIcon, RefreshIcon, CheckIcon, XIcon, FlagIcon, MsgIcon, TrashIcon, PenIcon, NoteIcon, RestoreIcon, PlusIcon, DownloadIcon } from "../components.jsx";
 
@@ -26,7 +26,7 @@ const TIME_SLOTS = (() => {
   return s;
 })();
 
-function BookingRow({ b, onUpdate, onDelete, onSMS, onEdit, onPayment, onAlert, onCancel, onConfirm }) {
+function BookingRow({ b, onUpdate, onDelete, onSMS, onEdit, onPayment, onAlert, onCancel, onConfirm, readOnly }) {
   const T = getT(); const s = sm(b.status); const [busy, setBusy] = useState(false);
   const act = async (updates) => { setBusy(true); try { await onUpdate(b.id, updates); } catch (e) { onAlert?.(e.message,"error"); } finally { setBusy(false); } };
   return (
@@ -40,28 +40,32 @@ function BookingRow({ b, onUpdate, onDelete, onSMS, onEdit, onPayment, onAlert, 
         <div style={{ fontSize:11, color:T.textMuted }}>{b.phone}{b.email && <span style={{ marginLeft:8 }}>{b.email}</span>}</div>
         <div style={{ fontSize:11, fontWeight:600, color:s.color, textTransform:"uppercase", letterSpacing:"0.04em", marginTop:2 }}>{displaySvc(b)}</div>
         {b.tireSize && <div style={{ fontSize:10, color:T.orange, marginTop:1 }}>{b.tireSize}</div>}
-        {b.notes && <div style={{ fontSize:11, color:T.textMuted, marginTop:3, display:"flex", alignItems:"flex-start", gap:4 }}><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0,marginTop:1}}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>{b.notes}</div>}
-
+        {b.mechanicNotes && <div style={{ fontSize:11, color:T.textMuted, marginTop:3, display:"flex", alignItems:"flex-start", gap:4 }}><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0,marginTop:1}}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>{b.mechanicNotes}</div>}
+        {b.notes && <div style={{ fontSize:11, color:T.textMuted, marginTop:2 }}>{b.notes}</div>}
       </div>
       <div style={{textAlign:"right",flexShrink:0}}>
         <Badge status={b.status}/>
         {b.finalPrice!=null&&<div style={{fontSize:12,fontWeight:700,color:T.green,marginTop:4}}>${b.finalPrice} <span style={{fontSize:10,color:T.textMuted,fontWeight:400}}>{b.paymentStatus||"unpaid"}</span></div>}
       </div>
-      <div style={{ display:"flex", gap:3, flexShrink:0 }}>
-        {!["completed","cancelled"].includes(b.status) && b.status !== "confirmed" && <IBtn v="accept" title="Confirm" onClick={() => onConfirm && onConfirm(b)} disabled={busy}><CheckIcon size={14}/></IBtn>}
-        {!["completed","cancelled"].includes(b.status) && <IBtn v="complete" title="Mark Complete" onClick={() => onEdit(b,"complete")} disabled={busy}><FlagIcon size={14}/></IBtn>}
-        {!["cancelled","completed"].includes(b.status) && <IBtn v="decline" title="Cancel" onClick={() => onCancel && onCancel(b)} disabled={busy}><XIcon size={14}/></IBtn>}
-        <IBtn v="sms"   title="Send SMS" onClick={() => onSMS(b)}    disabled={busy}><MsgIcon size={14}/></IBtn>
-        <IBtn v="edit"  title="Edit"     onClick={() => onEdit(b)}     disabled={busy}><PenIcon size={14}/></IBtn>
-        <IBtn v="sms"   title="Payment"  onClick={() => onPayment(b)}   disabled={busy}><DollarIcon size={14}/></IBtn>
-        <IBtn v="trash" title="Delete"   onClick={() => onDelete(b.id)} disabled={busy}><TrashIcon size={14}/></IBtn>
-      </div>
+      {/* Mechanics see bookings read-only — no action buttons */}
+      {!readOnly && (
+        <div style={{ display:"flex", gap:3, flexShrink:0 }}>
+          {!["completed","cancelled"].includes(b.status) && b.status !== "confirmed" && <IBtn v="accept" title="Confirm" onClick={() => onConfirm && onConfirm(b)} disabled={busy}><CheckIcon size={14}/></IBtn>}
+          {!["completed","cancelled"].includes(b.status) && <IBtn v="complete" title="Mark Complete" onClick={() => onEdit(b,"complete")} disabled={busy}><FlagIcon size={14}/></IBtn>}
+          {!["cancelled","completed"].includes(b.status) && <IBtn v="decline" title="Cancel" onClick={() => onCancel && onCancel(b)} disabled={busy}><XIcon size={14}/></IBtn>}
+          <IBtn v="sms"   title="Send SMS" onClick={() => onSMS(b)}    disabled={busy}><MsgIcon size={14}/></IBtn>
+          <IBtn v="edit"  title="Edit"     onClick={() => onEdit(b)}     disabled={busy}><PenIcon size={14}/></IBtn>
+          <IBtn v="sms"   title="Payment"  onClick={() => onPayment(b)}   disabled={busy}><DollarIcon size={14}/></IBtn>
+          <IBtn v="trash" title="Delete"   onClick={() => onDelete(b.id)} disabled={busy}><TrashIcon size={14}/></IBtn>
+        </div>
+      )}
     </div>
   );
 }
 
 export default function BookingsPage({ onAlert }) {
   const T = getT();
+  const isMechanic = getUserRole() === "mechanic";
   const [bookings,   setBookings]  = useState([]);
   const [deleted,    setDeleted]   = useState([]);
   const [loading,    setLoading]   = useState(true);
@@ -140,9 +144,9 @@ export default function BookingsPage({ onAlert }) {
         </div>
       </Card>
 
-      {/* Tabs */}
+      {/* Tabs — mechanics only see active/completed, not deleted */}
       <div style={{ display:"flex", gap:2, background:T.cardBg, border:`1px solid ${T.border}`, borderRadius:T.r10, padding:4, marginBottom:16, width:"fit-content" }}>
-        {[["active","Live Queue",active.length],["completed","Completed",completed.length],["deleted","Recently Deleted",deleted.length]].map(([id,label,count]) => (
+        {[["active","Live Queue",active.length],["completed","Completed",completed.length],...(isMechanic?[]:[ ["deleted","Recently Deleted",deleted.length] ])].map(([id,label,count]) => (
           <button key={id} onClick={()=>setTab(id)}
             style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 14px", borderRadius:T.r8, border:"none", background:tab===id?T.elevated:"transparent", color:tab===id?T.textPrimary:T.textMuted, fontSize:13, fontWeight:tab===id?600:400, fontFamily:T.font, cursor:"pointer", whiteSpace:"nowrap" }}>
             {label}
@@ -167,6 +171,7 @@ export default function BookingsPage({ onAlert }) {
               ))
             : shown.map(b => (
                 <BookingRow key={b.id} b={b}
+                  readOnly={isMechanic}
                   onUpdate={handleUpdate} onDelete={id=>setDeleteId(id)}
                   onSMS={setSmsB} onEdit={(b, mode="edit") => { setEditB(b); setEditMode(mode); }}
                   onPayment={b => { setEditB(b); setEditMode("payment"); }}

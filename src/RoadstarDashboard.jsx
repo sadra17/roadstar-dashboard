@@ -36,7 +36,7 @@ const BellOffI=p => <Ic {...p} ch={<><path d="m13.73 21a2 2 0 0 1-3.46 0"/><path
 function getNavItems(role) {
   const all = [
     { id:"today",     label:"Today",        Icon:CalI,  roles:["superadmin","owner","frontdesk","mechanic"] },
-    { id:"bookings",  label:"Bookings",      Icon:BkI,   roles:["superadmin","owner","frontdesk"] },
+    { id:"bookings",  label:"Bookings",      Icon:BkI,   roles:["superadmin","owner","frontdesk","mechanic"] },
     { id:"livebay",   label:"Live at Bay",   Icon:BayI,  roles:["superadmin","owner","frontdesk","mechanic"] },
     { id:"customers", label:"CRM",           Icon:UsrI,  roles:["superadmin","owner","frontdesk"] },
     { id:"analytics", label:"Analytics",     Icon:ChI,   roles:["superadmin","owner"] },
