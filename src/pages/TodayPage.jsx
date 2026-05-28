@@ -141,9 +141,8 @@ function QueueRow({ b, onConfirm, onCancel, onComplete, onNote, readOnly }) {
 
 
 // ── Walk-in booking modal ─────────────────────────────────────────────────────
-// Default preset — replaced at runtime with live services from settings
+// Fallback service list — only used if shop settings haven’t loaded yet
 const DEFAULT_SERVICES = ["Tire Change + Installation","Flat Tire Repair","Tire Rotation","Wheel Alignment","Tire Purchase","Other"];
-const TIME_SLOTS_WI = ["9:00 AM","9:15 AM","9:30 AM","9:45 AM","10:00 AM","10:15 AM","10:30 AM","10:45 AM","11:00 AM","11:15 AM","11:30 AM","11:45 AM","12:00 PM","12:15 PM","12:30 PM","12:45 PM","1:00 PM","1:15 PM","1:30 PM","1:45 PM","2:00 PM","2:15 PM","2:30 PM","2:45 PM","3:00 PM","3:15 PM","3:30 PM","3:45 PM","4:00 PM","4:15 PM","4:30 PM","4:45 PM","5:00 PM","5:15 PM","5:30 PM","5:45 PM"];
 
 // Mechanic note modal (used on Today page for mechanics)
 function MechanicNoteModal({ booking, onClose, onSave }) {
@@ -169,22 +168,53 @@ function MechanicNoteModal({ booking, onClose, onSave }) {
 
 function WalkInModal({ onClose, onSave, services }) {
   const T = getT();
-  const now = new Date();
-  const defaultTime = TIME_SLOTS_WI.find(t => {
-    const [h, m] = t.replace(/ (AM|PM)/, "").split(":").map(Number);
-    const h24 = t.includes("PM") && h !== 12 ? h + 12 : (t.includes("AM") && h === 12 ? 0 : h);
-    return h24 * 60 + m >= now.getHours() * 60 + now.getMinutes();
-  }) || "9:00 AM";
-
   const svcList = services?.length ? services : DEFAULT_SERVICES;
+  const todayIso = new Date().toISOString().slice(0, 10);
+
   const [form, setForm] = useState({
     firstName:"", lastName:"", phone:"", email:"",
-    service:svcList[0], date:now.toISOString().slice(0,10), time:defaultTime,
+    service:svcList[0], date:todayIso, time:"",
     tireSize:"", status:"confirmed",
   });
-  const [busy, setBusy] = useState(false);
-  const [err,  setErr]  = useState("");
+  const [slots,        setSlots]        = useState([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [busy,         setBusy]         = useState(false);
+  const [err,          setErr]          = useState("");
   const sf = (k, v) => setForm(p => ({ ...p, [k]: v }));
+
+  // Fetch available (non-full) time slots from the real availability endpoint
+  // whenever the date or service changes — this also prevents submitting a taken slot
+  useEffect(() => {
+    if (!form.date || !form.service) return;
+    let cancelled = false;
+    setSlotsLoading(true);
+    setSlots([]);
+    const BASE = import.meta.env.VITE_API_URL || "https://roadstar-api.onrender.com/api";
+    const token = localStorage.getItem("roadstar_token") || "";
+    let shopId = "";
+    try { shopId = JSON.parse(atob(token.split(".")[1])).shopId || ""; } catch {}
+    fetch(`${BASE}/availability?date=${encodeURIComponent(form.date)}&service=${encodeURIComponent(form.service)}&shopId=${encodeURIComponent(shopId)}`)
+      .then(r => r.json())
+      .then(d => {
+        if (cancelled) return;
+        const avail = d.available || [];
+        setSlots(avail);
+        // Auto-pick the first slot at or after now (for today), otherwise first slot
+        const isToday = form.date === new Date().toISOString().slice(0, 10);
+        const nowMins = isToday ? (new Date().getHours() * 60 + new Date().getMinutes()) : 0;
+        const picked = avail.find(t => {
+          const [tp, period] = [t.slice(0, t.lastIndexOf(" ")), t.slice(t.lastIndexOf(" ") + 1)];
+          const [h, m] = tp.split(":").map(Number);
+          const h24 = period === "PM" && h !== 12 ? h + 12 : (period === "AM" && h === 12 ? 0 : h);
+          return h24 * 60 + m >= nowMins;
+        }) || avail[0] || "";
+        setForm(p => ({ ...p, time: picked }));
+      })
+      .catch(() => { if (!cancelled) setSlots([]); })
+      .finally(() => { if (!cancelled) setSlotsLoading(false); });
+    return () => { cancelled = true; };
+  }, [form.date, form.service]);
+
   const Lbl = ({ children }) => (
     <label style={{ display:"block", fontSize:11, fontWeight:600, letterSpacing:"0.07em", textTransform:"uppercase", color:T.textMuted, marginBottom:5 }}>{children}</label>
   );
@@ -193,6 +223,7 @@ function WalkInModal({ onClose, onSave, services }) {
     if (!form.firstName.trim() || !form.lastName.trim() || !form.phone.trim()) {
       setErr("First name, last name and phone are required"); return;
     }
+    if (!form.time) { setErr("Please select an available time slot"); return; }
     setBusy(true); setErr("");
     try {
       await onSave(form);
@@ -216,7 +247,20 @@ function WalkInModal({ onClose, onSave, services }) {
       </div>
       <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:12, marginBottom:12 }}>
         <div><Lbl>Date</Lbl><Inp type="date" value={form.date} onChange={e=>sf("date",e.target.value)} style={{colorScheme:"dark"}}/></div>
-        <div><Lbl>Time</Lbl><Sel value={form.time} onChange={e=>sf("time",e.target.value)} options={TIME_SLOTS_WI.map(t=>({value:t,label:t}))}/></div>
+        <div>
+          <Lbl>Time {slotsLoading && <span style={{ fontWeight:400, textTransform:"none", letterSpacing:0 }}>— loading…</span>}</Lbl>
+          {slotsLoading ? (
+            <div style={{ padding:"9px 12px", background:T.elevated, border:`1.5px solid ${T.border}`, borderRadius:T.r8, fontSize:12, color:T.textMuted }}>
+              Checking availability…
+            </div>
+          ) : slots.length === 0 ? (
+            <div style={{ padding:"9px 12px", background:T.elevated, border:`1.5px solid ${T.redBorder}`, borderRadius:T.r8, fontSize:12, color:T.amber }}>
+              No available slots for this date/service
+            </div>
+          ) : (
+            <Sel value={form.time} onChange={e=>sf("time",e.target.value)} options={slots.map(t=>({value:t,label:t}))}/>
+          )}
+        </div>
         <div><Lbl>Tire size</Lbl><Inp value={form.tireSize} onChange={e=>sf("tireSize",e.target.value)} placeholder="225/65R17"/></div>
       </div>
       <div style={{ marginBottom:16 }}>
@@ -224,7 +268,7 @@ function WalkInModal({ onClose, onSave, services }) {
         <Sel value={form.status} onChange={e=>sf("status",e.target.value)} options={[{value:"confirmed",label:"Confirmed"},{value:"pending",label:"Pending"}]}/>
       </div>
       <div style={{ display:"flex", gap:8, paddingTop:14, borderTop:`1px solid ${T.border}` }}>
-        <Btn onClick={handleSave} disabled={busy} icon={<CheckIcon size={13} color="#fff"/>}>{busy?"Creating…":"Create Booking"}</Btn>
+        <Btn onClick={handleSave} disabled={busy || slotsLoading || slots.length === 0} icon={<CheckIcon size={13} color="#fff"/>}>{busy?"Creating…":"Create Booking"}</Btn>
         <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
       </div>
     </Modal>
