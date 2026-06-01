@@ -1,15 +1,18 @@
 // pages/LiveBayPage.jsx — Live Bay + Mechanic View
+// Cars only appear "Live at Bay" after a mechanic presses Start (accepts the job).
+// Pressing End records how long the customer was in the shop.
 import { useState, useEffect, useCallback } from "react";
-import { fetchLiveBay, updateBooking, baySnooze, extendBay, updateMechanic, getToken, getUserRole } from "../api.js";
+import { fetchLiveBay, updateBooking, baySnooze, extendBay, updateMechanic, bayStart, bayEnd, getToken, getUserRole } from "../api.js";
 import { getT, displaySvc, effectiveOcc } from "../theme.js";
-import { Badge, Btn, IBtn, Modal, ModalTitle, PageHeader, Spinner, Empty, Card, RefreshIcon, BayIcon, FlagIcon, ClockIcon, CheckIcon, PlusIcon, WrenchIcon } from "../components.jsx";
+import { Badge, Btn, IBtn, Modal, ModalTitle, PageHeader, Spinner, Empty, Card, RefreshIcon, BayIcon, FlagIcon, ClockIcon, CheckIcon, PlusIcon, WrenchIcon, NoteIcon } from "../components.jsx";
 
 export default function LiveBayPage({ onAlert }) {
   const T = getT();
   const role = getUserRole();
   const isMechanic = role === "mechanic";
+  const canWriteNote = ["mechanic","owner","superadmin"].includes(role); // matches manage:mechanic
 
-  const [data,    setData]    = useState({ active:[], upcoming:[] });
+  const [data,    setData]    = useState({ active:[], ready:[], upcoming:[] });
   const [loading, setLoading] = useState(true);
   const [noteB,   setNoteB]   = useState(null);
   const [completeB, setCompleteB] = useState(null);
@@ -17,7 +20,7 @@ export default function LiveBayPage({ onAlert }) {
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
-    try { const d = await fetchLiveBay(); setData(d || { active:[], upcoming:[] }); }
+    try { const d = await fetchLiveBay(); setData(d || { active:[], ready:[], upcoming:[] }); }
     catch (e) { onAlert?.(e.message,"error"); }
     finally { setLoading(false); }
   }, []);
@@ -25,6 +28,26 @@ export default function LiveBayPage({ onAlert }) {
   useEffect(() => { load(); const iv = setInterval(() => load(true), 20000); return () => clearInterval(iv); }, [load]);
 
   const setBusy_ = (id, v) => setBusy(p => ({ ...p, [id]: v }));
+
+  const handleStart = async (b) => {
+    setBusy_(b.id, true);
+    try { await bayStart(b.id); onAlert?.(`${b.firstName} is now live at bay`); load(true); }
+    catch (e) { onAlert?.(e.message,"error"); }
+    finally { setBusy_(b.id, false); }
+  };
+
+  const handleEnd = async (b) => {
+    setBusy_(b.id, true);
+    try {
+      const res = await bayEnd(b.id);
+      const mins = res?.durationMinutes ?? 0;
+      onAlert?.(`${b.firstName} ${b.lastName} was in the shop for ${mins} min`);
+      // Open the complete modal so they can pick the SMS option and finalize.
+      setCompleteB({ ...b, _durationMinutes: mins });
+      load(true);
+    } catch (e) { onAlert?.(e.message,"error"); }
+    finally { setBusy_(b.id, false); }
+  };
 
   const handleExtend = async (id, minutes) => {
     setBusy_(id, true);
@@ -52,18 +75,57 @@ export default function LiveBayPage({ onAlert }) {
 
   const getBayColor = (b) => BAY_COLORS[b.resourcePool==="alignment" ? "alignment" : (b.assignedBay || "default")] || T.blue;
 
+  // Shared customer-info block (tire + customer note + mechanic note) so the
+  // mechanic can read everything the front desk / customer left.
+  const CustomerInfo = (b) => (
+    <>
+      {b.tireSize && <div style={{ fontSize:11, color:T.orange, marginBottom:6, display:"flex", alignItems:"center", gap:4 }}><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/><path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4"/></svg>{b.tireSize}{b.tireQuantity ? ` · ${b.tireQuantity} tires` : ""}</div>}
+      {!b.tireSize && b.doesntKnowTireSize && <div style={{ fontSize:11, color:T.textMuted, marginBottom:6 }}>Tire size: doesn't know{b.tireQuantity ? ` · ${b.tireQuantity} tires` : ""}</div>}
+      {!b.tireSize && !b.doesntKnowTireSize && b.tireQuantity ? <div style={{ fontSize:11, color:T.textMuted, marginBottom:6 }}>{b.tireQuantity} tires</div> : null}
+      {b.notes && <div style={{ fontSize:11, color:T.textSecond, marginBottom:8, background:T.elevated, padding:"6px 9px", borderRadius:T.r8, display:"flex", alignItems:"flex-start", gap:5 }}><NoteIcon size={11} color={T.textMuted}/><span><b style={{color:T.textMuted}}>Customer note:</b> {b.notes}</span></div>}
+      {b.mechanicNotes && <div style={{ fontSize:11, color:T.textSecond, marginBottom:8, background:T.elevated, padding:"6px 9px", borderRadius:T.r8, display:"flex", alignItems:"flex-start", gap:5 }}><WrenchIcon size={11} color={T.textMuted}/><span><b style={{color:T.textMuted}}>Mechanic note:</b> {b.mechanicNotes}</span></div>}
+    </>
+  );
+
   return (
     <div>
       <PageHeader
         title={isMechanic ? "Mechanic View" : "Live at Bay"}
-        sub={isMechanic ? "Your active jobs and upcoming queue" : "Real-time bay status — auto-refreshes every 20 seconds"}
+        sub={isMechanic ? "Accept a job to start, end it when the car is done" : "Real-time bay status — auto-refreshes every 20 seconds"}
         actions={<Btn small variant="ghost" icon={<RefreshIcon size={13}/>} onClick={() => load()}>Refresh</Btn>}
       />
 
       {loading ? <Spinner/> : (
         <>
+          {/* ── Ready to start: mechanic must accept (Start) before going live ── */}
+          {data.ready && data.ready.length > 0 && (
+            <div style={{ marginBottom:24 }}>
+              <div style={{ fontSize:12, fontWeight:600, color:T.textMuted, letterSpacing:"0.07em", textTransform:"uppercase", marginBottom:10 }}>
+                Ready to start — {data.ready.length} waiting
+              </div>
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))", gap:14 }}>
+                {data.ready.map(b => (
+                  <div key={b.id} style={{ background:T.cardBg, border:`1.5px dashed ${T.border}`, borderRadius:T.r12, padding:"16px" }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+                      <span style={{ fontSize:11, fontWeight:700, letterSpacing:"0.06em", textTransform:"uppercase", color:T.textMuted }}>Scheduled {b.time}</span>
+                      <Badge status={b.status}/>
+                    </div>
+                    <div style={{ fontSize:16, fontWeight:700, color:T.textPrimary, marginBottom:2 }}>{b.firstName} {b.lastName}</div>
+                    <div style={{ fontSize:12, fontWeight:600, color:T.blue, marginBottom:6, textTransform:"uppercase", letterSpacing:"0.04em" }}>{displaySvc(b)}</div>
+                    {CustomerInfo(b)}
+                    <Btn variant="primary" small style={{ width:"100%", justifyContent:"center", marginTop:4 }} icon={<PlusIcon size={13} color="#fff"/>} disabled={busy[b.id]} onClick={() => handleStart(b)}>
+                      {busy[b.id] ? "Starting…" : "Start — Put in bay"}
+                    </Btn>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── Live at bay ── */}
           {data.active.length === 0 ? (
-            <Empty icon={null} title="No cars in a bay right now" sub="Confirmed bookings will appear here when their appointment time arrives"/>
+            (!data.ready || data.ready.length === 0) &&
+              <Empty icon={null} title="No cars in a bay right now" sub="Press Start on a scheduled booking to put a car in a bay"/>
           ) : (
             <>
               <div style={{ fontSize:12, color:T.textMuted, marginBottom:12 }}>
@@ -94,9 +156,8 @@ export default function LiveBayPage({ onAlert }) {
                       {/* Customer info */}
                       <div style={{ fontSize:16, fontWeight:700, color:T.textPrimary, marginBottom:2 }}>{b.firstName} {b.lastName}</div>
                       <div style={{ fontSize:12, fontWeight:600, color, marginBottom:4, textTransform:"uppercase", letterSpacing:"0.04em" }}>{displaySvc(b)}</div>
-                      <div style={{ fontSize:11, color:T.textMuted, marginBottom:b.tireSize?4:10 }}>{b.time} · {effectiveOcc(b)} min total{b._extendedBy > 0 ? ` (+${b._extendedBy} extended)` : ""}</div>
-                      {b.tireSize && <div style={{ fontSize:11, color:T.orange, marginBottom:10, display:"flex", alignItems:"center", gap:4 }}><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/><path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4"/></svg>{b.tireSize}</div>}
-                      {b.mechanicNotes && <div style={{ fontSize:11, color:T.textSecond, marginBottom:10, background:T.elevated, padding:"6px 9px", borderRadius:T.r8, display:"flex", alignItems:"flex-start", gap:5 }}><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0,marginTop:1,opacity:0.6}}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>{b.mechanicNotes}</div>}
+                      <div style={{ fontSize:11, color:T.textMuted, marginBottom:8 }}>In shop {b._elapsedMinutes ?? 0} min · {effectiveOcc(b)} min expected{b._extendedBy > 0 ? ` (+${b._extendedBy})` : ""}</div>
+                      {CustomerInfo(b)}
 
                       {/* Alert */}
                       {(isOver || isSoon) && (
@@ -107,9 +168,9 @@ export default function LiveBayPage({ onAlert }) {
 
                       {/* Actions */}
                       <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
-                        <Btn small variant="teal" icon={<FlagIcon size={12} color={T.teal}/>} onClick={() => setCompleteB(b)} disabled={busy[b.id]}>Done</Btn>
+                        <Btn small variant="success" icon={<FlagIcon size={12} color={T.green}/>} onClick={() => handleEnd(b)} disabled={busy[b.id]}>{busy[b.id]?"…":"End"}</Btn>
                         <Btn small variant="amber" icon={<ClockIcon size={12} color={T.amber}/>} onClick={() => handleExtend(b.id, 10)} disabled={busy[b.id]}>+10 min</Btn>
-                        {isMechanic && <Btn small variant="ghost" icon={<WrenchIcon size={12}/>} onClick={() => setNoteB(b)}>Note</Btn>}
+                        {canWriteNote && <Btn small variant="ghost" icon={<WrenchIcon size={12}/>} onClick={() => setNoteB(b)}>Note</Btn>}
                         {(isOver || isSoon) && (
                           <Btn small variant="ghost" onClick={() => baySnooze(b.id).then(() => load(true))}>Snooze</Btn>
                         )}
@@ -156,10 +217,15 @@ export default function LiveBayPage({ onAlert }) {
       {completeB && (
         <Modal onClose={() => setCompleteB(null)}>
           <ModalTitle>Mark as Completed</ModalTitle>
-          <p style={{ fontSize:13, color:T.textSecond, marginBottom:16 }}>{completeB.firstName} {completeB.lastName} — {displaySvc(completeB)}</p>
+          <p style={{ fontSize:13, color:T.textSecond, marginBottom:8 }}>{completeB.firstName} {completeB.lastName} — {displaySvc(completeB)}</p>
+          {completeB._durationMinutes != null && (
+            <div style={{ fontSize:13, fontWeight:700, color:T.green, marginBottom:16, background:T.greenBg, border:`1px solid ${T.greenBorder}`, borderRadius:T.r8, padding:"8px 12px" }}>
+              In the shop for {completeB._durationMinutes} min
+            </div>
+          )}
           {[["with_review","Complete + Review SMS"],["without_review","Complete + Thank-you SMS"],["none","Complete — No SMS"]].map(([v,label]) => (
             <Btn key={v} style={{ width:"100%", justifyContent:"center", marginBottom:8 }}
-              onClick={() => handleComplete(completeB, v)}>
+              onClick={() => handleComplete(completeB, v)} disabled={busy[completeB.id]}>
               {label}
             </Btn>
           ))}
@@ -176,6 +242,11 @@ function MechanicNoteModal({ booking, onClose, onSave }) {
   return (
     <Modal onClose={onClose}>
       <ModalTitle sub={`${booking.firstName} ${booking.lastName} — ${booking.service}`}>Mechanic Note</ModalTitle>
+      {booking.notes && (
+        <div style={{ fontSize:12, color:T.textSecond, marginBottom:12, background:T.elevated, padding:"8px 11px", borderRadius:T.r8 }}>
+          <b style={{ color:T.textMuted }}>Customer note:</b> {booking.notes}
+        </div>
+      )}
       <textarea value={note} onChange={e => setNote(e.target.value)} rows={4} placeholder="Add a mechanic note…"
         style={{ width:"100%", background:T.pageBg, border:`1.5px solid ${T.border}`, borderRadius:T.r8, padding:"10px 12px", color:T.textPrimary, fontSize:13, fontFamily:T.font, outline:"none", boxSizing:"border-box", resize:"vertical" }}/>
       <div style={{ display:"flex", gap:8, marginTop:12 }}>

@@ -84,6 +84,8 @@ export const updatePayment       = (id, u)   => api(`/bookings/${id}/payment`, {
 export const updateMechanic      = (id, u)   => api(`/bookings/${id}/mechanic`, { method: "PATCH", body: JSON.stringify(u) }).then(d => d.booking);
 export const extendBay           = (id, min) => api(`/bookings/${id}/extend-bay`, { method: "PATCH", body: JSON.stringify({ minutes: min }) }).then(d => d.booking);
 export const baySnooze           = (id)      => api(`/bookings/${id}/bay-snooze`, { method: "PATCH" }).then(d => d.booking);
+export const bayStart            = (id)      => api(`/bookings/${id}/bay-start`, { method: "PATCH" }).then(d => d.booking);
+export const bayEnd              = (id)      => api(`/bookings/${id}/bay-end`, { method: "PATCH" });
 export const sendSMS             = (id, t)   => api(`/bookings/${id}/sms`, { method: "POST", body: JSON.stringify({ messageType: t }) });
 
 // ── Live Bay ──────────────────────────────────────────────────────────────────
