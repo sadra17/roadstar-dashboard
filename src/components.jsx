@@ -204,6 +204,93 @@ export const NoteIcon    = p => <Ic {...p}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2
 export const WalkInIcon  = p => <Ic {...p}><circle cx="12" cy="5" r="2"/><path d="m15 14-3-6-3 6"/><path d="M9 11H7l-2 6"/><path d="m17 11 2 6"/></Ic>;
 export const AlertCircleIcon = p => <Ic {...p}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></Ic>;
 
+// ── Complete order modal (owner / front desk) ─────────────────────────────────
+// Forces a price + payment method BEFORE the order can be confirmed/completed,
+// then lets them choose whether to send an SMS. Used on Today + Bookings pages.
+// onConfirm(id, { finalPrice, paymentMethod, paymentStatus, completedSmsVariant })
+export function CompleteOrderModal({ booking: b, onClose, onConfirm }) {
+  const T = getT();
+  const [form, setForm] = useState({
+    finalPrice:    b.finalPrice    ?? "",
+    paymentMethod: b.paymentMethod ?? "",
+    paymentStatus: b.paymentStatus ?? "paid",
+    smsVariant:    "without_review",
+  });
+  const [busy, setBusy] = useState(false);
+  const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
+  const Lbl = ({ children, req }) => (
+    <label style={{ display:"block", fontSize:11, fontWeight:600, letterSpacing:"0.07em", textTransform:"uppercase", color:T.textMuted, marginBottom:5 }}>
+      {children}{req && <span style={{ color:T.red }}> *</span>}
+    </label>
+  );
+  const priceOk  = form.finalPrice !== "" && !isNaN(parseFloat(form.finalPrice)) && parseFloat(form.finalPrice) >= 0;
+  const methodOk = !!form.paymentMethod;
+  const canSubmit = priceOk && methodOk && !busy;
+
+  return (
+    <Modal onClose={onClose}>
+      <ModalTitle sub={`${b.firstName} ${b.lastName} — ${displaySvc(b)}`}>Complete Order</ModalTitle>
+      {b.bayDurationMinutes != null && (
+        <div style={{ fontSize:13, fontWeight:700, color:T.green, marginBottom:14, background:T.greenBg, border:`1px solid ${T.greenBorder}`, borderRadius:T.r8, padding:"8px 12px" }}>
+          Customer was in the shop for {b.bayDurationMinutes} min
+        </div>
+      )}
+      <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+        <div>
+          <Lbl req>How much was this customer charged ($)</Lbl>
+          <Inp type="number" value={form.finalPrice} onChange={e=>set("finalPrice",e.target.value)} placeholder="0.00"/>
+        </div>
+        <div>
+          <Lbl req>How did they pay</Lbl>
+          <Sel value={form.paymentMethod} onChange={e=>set("paymentMethod",e.target.value)}
+            options={[
+              {value:"",          label:"— Select —"},
+              {value:"cash",      label:"Cash"},
+              {value:"card",      label:"Card"},
+              {value:"cheque",    label:"Cheque"},
+              {value:"e-transfer",label:"e-Transfer"},
+              {value:"other",     label:"Other"},
+            ]}/>
+        </div>
+        <div>
+          <Lbl>Payment status</Lbl>
+          <Sel value={form.paymentStatus} onChange={e=>set("paymentStatus",e.target.value)}
+            options={[
+              {value:"paid",     label:"Paid"},
+              {value:"partial",  label:"Partial"},
+              {value:"unpaid",   label:"Unpaid"},
+              {value:"refunded", label:"Refunded"},
+            ]}/>
+        </div>
+        <div>
+          <Lbl>Text the customer?</Lbl>
+          <Sel value={form.smsVariant} onChange={e=>set("smsVariant",e.target.value)}
+            options={[
+              {value:"without_review", label:"Send thank-you SMS"},
+              {value:"with_review",    label:"Send Google review SMS"},
+              {value:"none",           label:"Don't send any SMS"},
+            ]}/>
+        </div>
+      </div>
+      {!canSubmit && (
+        <div style={{ fontSize:11, color:T.textMuted, marginTop:10 }}>Enter a price and payment method to complete.</div>
+      )}
+      <div style={{ display:"flex", gap:8, marginTop:16, paddingTop:14, borderTop:`1px solid ${T.border}` }}>
+        <Btn disabled={!canSubmit} icon={<CheckIcon size={13} color="#fff"/>}
+          onClick={async()=>{ setBusy(true); try { await onConfirm(b.id, {
+            finalPrice:    parseFloat(form.finalPrice),
+            paymentMethod: form.paymentMethod,
+            paymentStatus: form.paymentStatus,
+            completedSmsVariant: form.smsVariant,
+          }); } finally { setBusy(false); } }}>
+          {busy ? "Completing…" : "Confirm & Complete"}
+        </Btn>
+        <Btn variant="ghost" onClick={onClose} disabled={busy}>Cancel</Btn>
+      </div>
+    </Modal>
+  );
+}
+
 // ── Confirmation modal (reusable for any destructive action) ──────────────────
 // Usage: <ConfirmModal title="Delete user?" message="This cannot be undone."
 //          confirmLabel="Yes, delete" confirmVariant="danger"

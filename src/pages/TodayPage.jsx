@@ -1,8 +1,17 @@
 // pages/TodayPage.jsx — no emoji, SVG icons throughout
 import { useState, useEffect, useCallback } from "react";
-import { fetchBookings, fetchLiveBay, updateBooking, baySnooze, extendBay, getUserRole, fetchSettings, updateMechanic } from "../api.js";
+import { fetchBookings, fetchLiveBay, updateBooking, updatePayment, baySnooze, extendBay, bayStart, bayEnd, getUserRole, fetchSettings, updateMechanic } from "../api.js";
 import { getT, sm, displaySvc, effectiveOcc, todayStr } from "../theme.js";
-import { Badge, Btn, IBtn, Modal, ModalTitle, Sel, Inp, StatCard, PageHeader, Spinner, CheckIcon, XIcon, FlagIcon, ClockIcon, BayIcon, RefreshIcon, PlusIcon, ConfirmModal, TrashIcon, WrenchIcon } from "../components.jsx";
+import { Badge, Btn, IBtn, Modal, ModalTitle, Sel, Inp, StatCard, PageHeader, Spinner, CheckIcon, XIcon, FlagIcon, ClockIcon, BayIcon, RefreshIcon, PlusIcon, ConfirmModal, CompleteOrderModal, TrashIcon, WrenchIcon } from "../components.jsx";
+
+// A car is "Live at Bay" once a mechanic presses Start, and "Done" once they
+// press Finished (until the front desk completes it with a price).
+const bayState = (b) => {
+  if (["completed","cancelled"].includes(b.status)) return null;
+  if (b.bayStartedAt && !b.bayEndedAt) return "live";
+  if (b.bayEndedAt) return "done";
+  return null;
+};
 
 // Walk-in uses POST /api/book directly (same as Shopify form)
 async function createWalkIn(form) {
@@ -32,8 +41,9 @@ const CheckCircle = ({ size, color }) => <Ic size={size} color={color} ch={<><pa
 const UserIcon    = ({ size, color }) => <Ic size={size} color={color} ch={<><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>}/>;
 const TireIcon    = ({ size, color }) => <Ic size={size} color={color} ch={<><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/><path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4"/></>}/>;
 
-function LiveCard({ b, onComplete, onSnooze, onExtend }) {
+function LiveCard({ b, onFinish, onSnooze, onExtend }) {
   const T = getT();
+  const [busy, setBusy] = useState(false);
   const isOver  = b.minutesRemaining <= 0;
   const isSoon  = b.minutesRemaining > 0 && b.minutesRemaining <= 5;
   const isAlign = b.resourcePool === "alignment";
@@ -61,6 +71,7 @@ function LiveCard({ b, onComplete, onSnooze, onExtend }) {
 
       <div style={{ fontSize:14, fontWeight:700, color:T.textPrimary, marginBottom:2 }}>{b.firstName} {b.lastName}</div>
       <div style={{ fontSize:11, fontWeight:600, color:accentColor, textTransform:"uppercase", letterSpacing:"0.04em", marginBottom:8 }}>{displaySvc(b)}</div>
+      {b._elapsedMinutes != null && <div style={{ fontSize:11, color:T.textMuted, marginBottom:8 }}>In shop {b._elapsedMinutes} min</div>}
 
       {b.tireSize && (
         <div style={{ display:"flex", alignItems:"center", gap:5, fontSize:11, color:T.textMuted, marginBottom:8 }}>
@@ -77,7 +88,8 @@ function LiveCard({ b, onComplete, onSnooze, onExtend }) {
       )}
 
       <div style={{ display:"flex", gap:5 }}>
-        <Btn small variant="teal" icon={<FlagIcon size={12} color={T.teal}/>} onClick={() => onComplete(b)}>Done</Btn>
+        <Btn small variant="success" icon={<FlagIcon size={12} color={T.green}/>} disabled={busy}
+          onClick={async () => { setBusy(true); try { await onFinish(b); } finally { setBusy(false); } }}>{busy ? "…" : "Finished"}</Btn>
         <Btn small variant="amber" icon={<ClockIcon size={12} color={T.amber}/>} onClick={() => onExtend(b.id, 10)}>+10</Btn>
         {(isOver || isSoon) && <Btn small variant="ghost" onClick={() => onSnooze(b.id)}>Snooze</Btn>}
       </div>
@@ -85,11 +97,26 @@ function LiveCard({ b, onComplete, onSnooze, onExtend }) {
   );
 }
 
-function QueueRow({ b, onConfirm, onCancel, onComplete, onNote, readOnly }) {
+function BayPill({ kind }) {
+  const T = getT();
+  const c = kind === "live" ? T.green : T.amber;
+  const label = kind === "live" ? "Live at Bay" : "Done — needs payment";
+  return (
+    <span style={{ display:"inline-flex", alignItems:"center", gap:5, fontSize:11, fontWeight:700, letterSpacing:"0.05em", textTransform:"uppercase", padding:"3px 9px", borderRadius:20, background:`${c}18`, color:c, border:`1px solid ${c}55`, whiteSpace:"nowrap" }}>
+      <span style={{ width:5, height:5, borderRadius:"50%", background:c, boxShadow:`0 0 4px ${c}80` }}/>
+      {label}
+    </span>
+  );
+}
+
+function QueueRow({ b, onConfirm, onCancel, onComplete, onStart, onFinish, onNote, readOnly }) {
   const T = getT();
   const s = sm(b.status);
+  const bay = bayState(b);
   const [busy, setBusy] = useState(false);
   const act = async (fn) => { setBusy(true); try { await fn(); } finally { setBusy(false); } };
+  // Ready to start = confirmed, needs a bay, not already in/through a bay.
+  const canStart = !bay && b.status === "confirmed" && b.resourcePool !== "none";
   return (
     <div style={{ background:T.cardBg, borderLeft:`3px solid ${s.color}`, border:`1px solid ${T.border}`, borderRadius:T.r10, opacity:busy?0.6:1 }}>
       <div style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 16px" }}>
@@ -105,8 +132,17 @@ function QueueRow({ b, onConfirm, onCancel, onComplete, onNote, readOnly }) {
           {b.tireSize && <div style={{ fontSize:10, color:T.textMuted, display:"flex", alignItems:"center", gap:4 }}><TireIcon size={10} color={T.textMuted}/>{b.tireSize}</div>}
           {b.phone && <div style={{ fontSize:10, color:T.textMuted, marginTop:1 }}>{b.phone}</div>}
         </div>
-        <Badge status={b.status}/>
-        <div style={{ display:"flex", gap:3 }}>
+        {bay ? <BayPill kind={bay}/> : <Badge status={b.status}/>}
+        <div style={{ display:"flex", gap:3, alignItems:"center" }}>
+          {/* Start / Finished — available to everyone, including mechanics */}
+          {canStart && onStart && (
+            <Btn small variant="primary" icon={<BayIcon size={12} color="#fff"/>} disabled={busy}
+              onClick={() => act(() => onStart(b))}>Start</Btn>
+          )}
+          {bay === "live" && onFinish && (
+            <Btn small variant="success" icon={<FlagIcon size={12} color={T.green}/>} disabled={busy}
+              onClick={() => act(() => onFinish(b))}>Finished</Btn>
+          )}
           {/* Mechanic: note button only — no booking actions */}
           {readOnly && onNote && (
             <IBtn v="ghost" title="Mechanic note" onClick={() => onNote(b)}><WrenchIcon size={14}/></IBtn>
@@ -319,8 +355,31 @@ export default function TodayPage({ onAlert }) {
     setBookings(p => p.map(b => b.id === id ? u : b));
   };
 
-  const handleComplete = async (booking, variant) => {
-    await act(booking.id, { status:"completed", completedSmsVariant:variant, sendSMS:variant!=="none" });
+  // Anyone (mechanic included) can put a confirmed car into a bay from here.
+  const handleStart = async (booking) => {
+    try {
+      await bayStart(booking.id);
+      onAlert?.(`${booking.firstName} ${booking.lastName} is now live at bay`);
+      load(true);
+    } catch (e) { onAlert?.(e.message, "error"); }
+  };
+
+  // Mechanic / staff press "Finished" on a live bay car → records time in shop,
+  // does NOT complete it. The front desk completes it afterwards with a price.
+  const handleFinish = async (booking) => {
+    try {
+      const res = await bayEnd(booking.id);
+      onAlert?.(`${booking.firstName} ${booking.lastName} — in shop ${res?.durationMinutes ?? 0} min. Ready for front desk to complete.`);
+      load(true);
+    } catch (e) { onAlert?.(e.message, "error"); }
+  };
+
+  // Owner / front desk complete the order — price + payment method are required
+  // (enforced by CompleteOrderModal), then optionally send an SMS.
+  const handleComplete = async (id, payload) => {
+    const { finalPrice, paymentMethod, paymentStatus, completedSmsVariant } = payload;
+    await updatePayment(id, { finalPrice, paymentMethod, paymentStatus });
+    await act(id, { status:"completed", completedSmsVariant, sendSMS: completedSmsVariant !== "none" });
     setCompleteB(null);
     load(true);
   };
@@ -370,7 +429,7 @@ export default function TodayPage({ onAlert }) {
           <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))", gap:10 }}>
             {liveBay.active.map(b => (
               <LiveCard key={b.id} b={b}
-                onComplete={b => setCompleteB(b)}
+                onFinish={handleFinish}
                 onSnooze={id => baySnooze(id).then(() => load(true)).catch(e => onAlert?.(e.message,"error"))}
                 onExtend={(id, m) => extendBay(id, m).then(() => { onAlert?.(`+${m} min added`); load(true); }).catch(e => onAlert?.(e.message,"error"))}
               />
@@ -401,6 +460,8 @@ export default function TodayPage({ onAlert }) {
             <QueueRow key={b.id} b={b}
               readOnly={isMechanic}
               onNote={isMechanic ? setNoteB : null}
+              onStart={handleStart}
+              onFinish={handleFinish}
               onConfirm={id => act(id, { status:"confirmed" }).then(() => onAlert?.("Confirmed"))}
               onCancel={b => setCancelB(b)}
               onComplete={setCompleteB}
@@ -437,25 +498,9 @@ export default function TodayPage({ onAlert }) {
         />
       )}
 
-      {/* Complete modal */}
+      {/* Complete order modal — forces price + payment method before confirming */}
       {completeB && (
-        <Modal onClose={() => setCompleteB(null)}>
-          <ModalTitle sub={`${completeB.firstName} ${completeB.lastName} — ${displaySvc(completeB)}`}>Mark as Completed</ModalTitle>
-          <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-            {[
-              { v:"with_review",    label:"Complete + send Google review SMS",   accent:T.amber },
-              { v:"without_review", label:"Complete + send thank-you SMS",       accent:T.teal  },
-              { v:"none",           label:"Complete — no SMS",                   accent:T.textMuted },
-            ].map(({ v, label, accent }) => (
-              <button key={v} onClick={() => handleComplete(completeB, v)}
-                style={{ width:"100%", padding:"11px 16px", background:T.elevated, border:`1px solid ${T.border}`, borderRadius:T.r10, color:accent, fontSize:13, fontWeight:500, fontFamily:T.font, cursor:"pointer", textAlign:"left", transition:"all .12s" }}
-                onMouseEnter={e => e.currentTarget.style.borderColor = accent}
-                onMouseLeave={e => e.currentTarget.style.borderColor = T.border}>
-                {label}
-              </button>
-            ))}
-          </div>
-        </Modal>
+        <CompleteOrderModal booking={completeB} onClose={() => setCompleteB(null)} onConfirm={handleComplete}/>
       )}
 
       {/* Cancel booking confirmation */}

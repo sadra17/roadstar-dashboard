@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { fetchBookings, fetchRecentlyDeleted, updateBooking, deleteBooking, restoreBooking, sendSMS, updatePayment, getUserRole } from "../api.js";
 import { getT, sm, displaySvc, effectiveOcc, fmtDate, todayStr } from "../theme.js";
-import { Badge, Btn, IBtn, Modal, ModalTitle, Inp, Sel, PageHeader, Spinner, Empty, Card, SearchIcon, RefreshIcon, CheckIcon, XIcon, FlagIcon, MsgIcon, TrashIcon, PenIcon, NoteIcon, RestoreIcon, PlusIcon, DownloadIcon } from "../components.jsx";
+import { Badge, Btn, IBtn, Modal, ModalTitle, Inp, Sel, PageHeader, Spinner, Empty, Card, CompleteOrderModal, SearchIcon, RefreshIcon, CheckIcon, XIcon, FlagIcon, MsgIcon, TrashIcon, PenIcon, NoteIcon, RestoreIcon, PlusIcon, DownloadIcon } from "../components.jsx";
 
 
 const DollarIcon = ({ size=14, color="currentColor" }) => (
@@ -190,17 +190,16 @@ export default function BookingsPage({ onAlert }) {
           onSave={async (id, u) => { await handleUpdate(id, u); setEditB(null); }}/>
       )}
 
-      {/* Complete modal */}
+      {/* Complete modal — forces price + payment method before confirming */}
       {editB && editMode === "complete" && (
-        <Modal onClose={() => setEditB(null)}>
-          <ModalTitle>Mark as Completed — {editB.firstName}</ModalTitle>
-          {[["with_review","Complete + Review SMS"],["without_review","Complete + Thank-you SMS"],["none","Complete — No SMS"]].map(([v,label]) => (
-            <Btn key={v} style={{ width:"100%", justifyContent:"center", marginBottom:8 }}
-              onClick={async () => { await handleUpdate(editB.id,{status:"completed",completedSmsVariant:v,sendSMS:v!=="none"}); setEditB(null); }}>
-              {label}
-            </Btn>
-          ))}
-        </Modal>
+        <CompleteOrderModal booking={editB} onClose={() => setEditB(null)}
+          onConfirm={async (id, { finalPrice, paymentMethod, paymentStatus, completedSmsVariant }) => {
+            try {
+              await updatePayment(id, { finalPrice, paymentMethod, paymentStatus });
+              await handleUpdate(id, { status:"completed", completedSmsVariant, sendSMS: completedSmsVariant !== "none" });
+              setEditB(null);
+            } catch (e) { onAlert?.(e.message, "error"); }
+          }}/>
       )}
 
 

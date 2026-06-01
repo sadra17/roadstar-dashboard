@@ -1,8 +1,9 @@
 // pages/LiveBayPage.jsx — Live Bay + Mechanic View
 // Cars only appear "Live at Bay" after a mechanic presses Start (accepts the job).
-// Pressing End records how long the customer was in the shop.
+// Pressing Finished records how long the customer was in the shop and hands the
+// order to the front desk/owner to complete (with a price) — it does not auto-complete.
 import { useState, useEffect, useCallback } from "react";
-import { fetchLiveBay, updateBooking, baySnooze, extendBay, updateMechanic, bayStart, bayEnd, getToken, getUserRole } from "../api.js";
+import { fetchLiveBay, baySnooze, extendBay, updateMechanic, bayStart, bayEnd, getToken, getUserRole } from "../api.js";
 import { getT, displaySvc, effectiveOcc } from "../theme.js";
 import { Badge, Btn, IBtn, Modal, ModalTitle, PageHeader, Spinner, Empty, Card, RefreshIcon, BayIcon, FlagIcon, ClockIcon, CheckIcon, PlusIcon, WrenchIcon, NoteIcon } from "../components.jsx";
 
@@ -15,7 +16,6 @@ export default function LiveBayPage({ onAlert }) {
   const [data,    setData]    = useState({ active:[], ready:[], upcoming:[] });
   const [loading, setLoading] = useState(true);
   const [noteB,   setNoteB]   = useState(null);
-  const [completeB, setCompleteB] = useState(null);
   const [busy,    setBusy]    = useState({});
 
   const load = useCallback(async (silent = false) => {
@@ -36,14 +36,14 @@ export default function LiveBayPage({ onAlert }) {
     finally { setBusy_(b.id, false); }
   };
 
+  // Mechanic presses Finished → records time in shop. Does NOT complete the
+  // order — the front desk/owner completes it later with a price.
   const handleEnd = async (b) => {
     setBusy_(b.id, true);
     try {
       const res = await bayEnd(b.id);
       const mins = res?.durationMinutes ?? 0;
-      onAlert?.(`${b.firstName} ${b.lastName} was in the shop for ${mins} min`);
-      // Open the complete modal so they can pick the SMS option and finalize.
-      setCompleteB({ ...b, _durationMinutes: mins });
+      onAlert?.(`${b.firstName} ${b.lastName} was in the shop for ${mins} min — sent to front desk to complete`);
       load(true);
     } catch (e) { onAlert?.(e.message,"error"); }
     finally { setBusy_(b.id, false); }
@@ -54,17 +54,6 @@ export default function LiveBayPage({ onAlert }) {
     try { await extendBay(id, minutes); onAlert?.(`+${minutes} min added`); load(true); }
     catch (e) { onAlert?.(e.message,"error"); }
     finally { setBusy_(id, false); }
-  };
-
-  const handleComplete = async (booking, variant) => {
-    setBusy_(booking.id, true);
-    try {
-      await updateBooking(booking.id, { status:"completed", completedSmsVariant:variant, sendSMS:variant!=="none" });
-      onAlert?.("Marked complete");
-      setCompleteB(null);
-      load(true);
-    } catch (e) { onAlert?.(e.message,"error"); }
-    finally { setBusy_(booking.id, false); }
   };
 
   const BAY_COLORS = {
@@ -168,7 +157,7 @@ export default function LiveBayPage({ onAlert }) {
 
                       {/* Actions */}
                       <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
-                        <Btn small variant="success" icon={<FlagIcon size={12} color={T.green}/>} onClick={() => handleEnd(b)} disabled={busy[b.id]}>{busy[b.id]?"…":"End"}</Btn>
+                        <Btn small variant="success" icon={<FlagIcon size={12} color={T.green}/>} onClick={() => handleEnd(b)} disabled={busy[b.id]}>{busy[b.id]?"…":"Finished"}</Btn>
                         <Btn small variant="amber" icon={<ClockIcon size={12} color={T.amber}/>} onClick={() => handleExtend(b.id, 10)} disabled={busy[b.id]}>+10 min</Btn>
                         {canWriteNote && <Btn small variant="ghost" icon={<WrenchIcon size={12}/>} onClick={() => setNoteB(b)}>Note</Btn>}
                         {(isOver || isSoon) && (
@@ -213,24 +202,6 @@ export default function LiveBayPage({ onAlert }) {
         />
       )}
 
-      {/* Complete modal */}
-      {completeB && (
-        <Modal onClose={() => setCompleteB(null)}>
-          <ModalTitle>Mark as Completed</ModalTitle>
-          <p style={{ fontSize:13, color:T.textSecond, marginBottom:8 }}>{completeB.firstName} {completeB.lastName} — {displaySvc(completeB)}</p>
-          {completeB._durationMinutes != null && (
-            <div style={{ fontSize:13, fontWeight:700, color:T.green, marginBottom:16, background:T.greenBg, border:`1px solid ${T.greenBorder}`, borderRadius:T.r8, padding:"8px 12px" }}>
-              In the shop for {completeB._durationMinutes} min
-            </div>
-          )}
-          {[["with_review","Complete + Review SMS"],["without_review","Complete + Thank-you SMS"],["none","Complete — No SMS"]].map(([v,label]) => (
-            <Btn key={v} style={{ width:"100%", justifyContent:"center", marginBottom:8 }}
-              onClick={() => handleComplete(completeB, v)} disabled={busy[completeB.id]}>
-              {label}
-            </Btn>
-          ))}
-        </Modal>
-      )}
     </div>
   );
 }
