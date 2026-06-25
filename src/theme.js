@@ -150,6 +150,25 @@ export function todayStr() {
   return new Date().toISOString().slice(0, 10);
 }
 
+// Auto-format a tire size as the user types: inserts the "/" and "R" so that
+// e.g. "2256517" becomes "225/65R17". Letters are upper-cased. Anything that
+// isn't a plain ###/##R## sequence is left mostly as typed (just upper-cased)
+// so unusual sizes (P-metric, LT, 31x10.5R15, etc.) still work.
+export function formatTireSize(raw) {
+  if (!raw) return "";
+  let v = raw.toUpperCase();
+  const digits = v.replace(/[^0-9]/g, "");
+  // Only auto-insert separators when the input is purely digits (the common case).
+  if (/^[0-9]+$/.test(v.replace(/\s/g, "")) && digits.length >= 4) {
+    const d = digits.slice(0, 7); // width(3) + ratio(2) + rim(2)
+    let out = d.slice(0, 3);
+    if (d.length > 3) out += "/" + d.slice(3, 5);
+    if (d.length > 5) out += "R" + d.slice(5, 7);
+    return out;
+  }
+  return v;
+}
+
 export function fmtDate(d) {
   if (!d) return "";
   if (d === todayStr()) return "Today";

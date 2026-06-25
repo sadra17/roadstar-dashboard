@@ -76,10 +76,10 @@ export function Sel({ value, onChange, options, style = {} }) {
 }
 
 // ── Modal overlay ─────────────────────────────────────────────────────────────
-export function Modal({ children, onClose, wide = false }) {
+export function Modal({ children, onClose, wide = false, persistent = false }) {
   const T = getT();
   return (
-    <div onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+    <div onClick={e => { if (!persistent && e.target === e.currentTarget) onClose(); }}
       style={{ position:"fixed", inset:0, background:"rgba(2,4,12,.85)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center", padding:16, backdropFilter:"blur(4px)" }}>
       <div style={{ background:T.panelBg, border:`1px solid ${T.borderVis}`, borderRadius:T.r16, padding:24, maxWidth:wide?720:480, width:"100%", boxShadow:T.shadowLg, maxHeight:"90vh", overflowY:"auto", position:"relative" }}>
         <button onClick={onClose} style={{ position:"absolute", top:12, right:12, background:T.elevated, border:`1px solid ${T.border}`, borderRadius:T.r8, width:28, height:28, display:"flex", alignItems:"center", justifyContent:"center", color:T.textMuted, cursor:"pointer" }}>

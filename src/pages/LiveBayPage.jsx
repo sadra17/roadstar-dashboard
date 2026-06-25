@@ -68,9 +68,9 @@ export default function LiveBayPage({ onAlert }) {
   // mechanic can read everything the front desk / customer left.
   const CustomerInfo = (b) => (
     <>
-      {b.tireSize && <div style={{ fontSize:11, color:T.orange, marginBottom:6, display:"flex", alignItems:"center", gap:4 }}><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/><path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4"/></svg>{b.tireSize}{b.tireQuantity ? ` · ${b.tireQuantity} tires` : ""}</div>}
-      {!b.tireSize && b.doesntKnowTireSize && <div style={{ fontSize:11, color:T.textMuted, marginBottom:6 }}>Tire size: doesn't know{b.tireQuantity ? ` · ${b.tireQuantity} tires` : ""}</div>}
-      {!b.tireSize && !b.doesntKnowTireSize && b.tireQuantity ? <div style={{ fontSize:11, color:T.textMuted, marginBottom:6 }}>{b.tireQuantity} tires</div> : null}
+      {b.tireSize && <div style={{ fontSize:16, fontWeight:700, color:T.orange, marginBottom:7, display:"flex", alignItems:"center", gap:6, letterSpacing:"0.02em" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/><path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4"/></svg>{b.tireSize}{b.tireQuantity ? ` · ${b.tireQuantity} tires` : ""}</div>}
+      {!b.tireSize && b.doesntKnowTireSize && <div style={{ fontSize:13, fontWeight:600, color:T.textMuted, marginBottom:7 }}>Tire size: doesn't know{b.tireQuantity ? ` · ${b.tireQuantity} tires` : ""}</div>}
+      {!b.tireSize && !b.doesntKnowTireSize && b.tireQuantity ? <div style={{ fontSize:13, fontWeight:600, color:T.textMuted, marginBottom:7 }}>{b.tireQuantity} tires</div> : null}
       {b.notes && <div style={{ fontSize:11, color:T.textSecond, marginBottom:8, background:T.elevated, padding:"6px 9px", borderRadius:T.r8, display:"flex", alignItems:"flex-start", gap:5 }}><NoteIcon size={11} color={T.textMuted}/><span><b style={{color:T.textMuted}}>Customer note:</b> {b.notes}</span></div>}
       {b.mechanicNotes && <div style={{ fontSize:11, color:T.textSecond, marginBottom:8, background:T.elevated, padding:"6px 9px", borderRadius:T.r8, display:"flex", alignItems:"flex-start", gap:5 }}><WrenchIcon size={11} color={T.textMuted}/><span><b style={{color:T.textMuted}}>Mechanic note:</b> {b.mechanicNotes}</span></div>}
     </>

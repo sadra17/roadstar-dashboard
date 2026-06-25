@@ -197,6 +197,42 @@ export default function RoadstarDashboard({ onLogout }) {
     document.head.appendChild(style);
   }, [theme]);
 
+  // Pull-to-refresh: pulling down from the very top of the page reloads it.
+  useEffect(() => {
+    let startY = 0, pulling = false, fired = false;
+    const indicator = document.createElement("div");
+    indicator.textContent = "↻ Release to refresh";
+    indicator.style.cssText = `position:fixed;top:0;left:0;right:0;z-index:9000;text-align:center;
+      padding:10px;font-family:${T.font};font-size:13px;font-weight:600;color:${T.blueBright || T.blue};
+      background:${T.cardBg};border-bottom:1px solid ${T.border};transform:translateY(-100%);
+      transition:transform .15s;pointer-events:none;`;
+    document.body.appendChild(indicator);
+
+    const onStart = e => { if (window.scrollY <= 0) { startY = e.touches[0].clientY; pulling = true; fired = false; } };
+    const onMove = e => {
+      if (!pulling) return;
+      const dy = e.touches[0].clientY - startY;
+      if (dy > 0 && window.scrollY <= 0) {
+        indicator.style.transform = `translateY(${Math.min(0, -100 + dy / 1.2)}%)`;
+        if (dy > 90) fired = true;
+      }
+    };
+    const onEnd = () => {
+      pulling = false;
+      indicator.style.transform = "translateY(-100%)";
+      if (fired) window.location.reload();
+    };
+    window.addEventListener("touchstart", onStart, { passive:true });
+    window.addEventListener("touchmove", onMove, { passive:true });
+    window.addEventListener("touchend", onEnd);
+    return () => {
+      window.removeEventListener("touchstart", onStart);
+      window.removeEventListener("touchmove", onMove);
+      window.removeEventListener("touchend", onEnd);
+      indicator.remove();
+    };
+  }, [theme]);
+
   const SIDEBAR_W = 220;
 
   // ── Nav item ──────────────────────────────────────────────────────────────
@@ -357,8 +393,8 @@ export default function RoadstarDashboard({ onLogout }) {
   return (
     <div style={{ display:"flex", minHeight:"100vh", background:T.pageBg, fontFamily:T.font, overflowX:"hidden", position:"relative" }}>
 
-      {/* ── Desktop sidebar ── */}
-      <div style={{ width:SIDEBAR_W, flexShrink:0, height:"100vh", position:"sticky", top:0, overflowY:"auto", borderRight:`1px solid ${T.border}` }}
+      {/* ── Desktop sidebar — fixed so it never scrolls with the page ── */}
+      <div style={{ width:SIDEBAR_W, height:"100vh", position:"fixed", left:0, top:0, overflowY:"auto", borderRight:`1px solid ${T.border}`, background:T.sideBg || T.cardBg, zIndex:50 }}
         className="rs-sidebar-desk">
         <SidebarContent/>
       </div>
@@ -375,8 +411,8 @@ export default function RoadstarDashboard({ onLogout }) {
         </div>
       )}
 
-      {/* ── Main area ── */}
-      <div style={{ flex:1, minWidth:0, display:"flex", flexDirection:"column" }}>
+      {/* ── Main area — offset by the fixed sidebar width on desktop ── */}
+      <div style={{ flex:1, minWidth:0, display:"flex", flexDirection:"column", marginLeft:SIDEBAR_W }} className="rs-main">
 
         {/* Mobile top bar */}
         <div style={{ display:"none", alignItems:"center", gap:12, padding:"0 16px", height:54,
@@ -407,6 +443,7 @@ export default function RoadstarDashboard({ onLogout }) {
       <style>{`
         @media (max-width: 767px) {
           .rs-sidebar-desk { display: none !important; }
+          .rs-main { margin-left: 0 !important; }
           .rs-topbar { display: flex !important; }
           .rs-drawer-overlay { display: flex !important; }
           .rs-page-content { padding: 16px 14px 32px !important; }

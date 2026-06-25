@@ -1,8 +1,8 @@
 // pages/TodayPage.jsx — no emoji, SVG icons throughout
 import { useState, useEffect, useCallback } from "react";
 import { fetchBookings, fetchLiveBay, updateBooking, updatePayment, baySnooze, extendBay, bayStart, bayEnd, getUserRole, fetchSettings, updateMechanic } from "../api.js";
-import { getT, sm, displaySvc, effectiveOcc, todayStr } from "../theme.js";
-import { Badge, Btn, IBtn, Modal, ModalTitle, Sel, Inp, StatCard, PageHeader, Spinner, CheckIcon, XIcon, FlagIcon, ClockIcon, BayIcon, RefreshIcon, PlusIcon, ConfirmModal, CompleteOrderModal, TrashIcon, WrenchIcon } from "../components.jsx";
+import { getT, sm, displaySvc, effectiveOcc, todayStr, formatTireSize } from "../theme.js";
+import { Badge, Btn, IBtn, Modal, ModalTitle, Sel, Inp, StatCard, PageHeader, Spinner, CheckIcon, XIcon, FlagIcon, ClockIcon, BayIcon, RefreshIcon, PlusIcon, ConfirmModal, CompleteOrderModal, TrashIcon, WrenchIcon, NoteIcon } from "../components.jsx";
 
 // A car is "Live at Bay" once a mechanic presses Start, and "Done" once they
 // press Finished (until the front desk completes it with a price).
@@ -97,6 +97,19 @@ function LiveCard({ b, onFinish, onSnooze, onExtend }) {
   );
 }
 
+// Shows where the booking came from: a staff walk-in or the public online form.
+function SourceTag({ source }) {
+  const T = getT();
+  if (!source) return null;
+  const walkin = source === "walkin";
+  const c = walkin ? T.purple : T.blue;
+  return (
+    <span style={{ fontSize:9, fontWeight:700, letterSpacing:"0.05em", textTransform:"uppercase", padding:"2px 7px", borderRadius:20, background:`${c}18`, color:c, border:`1px solid ${c}40`, whiteSpace:"nowrap" }}>
+      {walkin ? "Walk-in" : "Booked online"}
+    </span>
+  );
+}
+
 function BayPill({ kind }) {
   const T = getT();
   const c = kind === "live" ? T.green : T.amber;
@@ -127,9 +140,17 @@ function QueueRow({ b, onConfirm, onCancel, onComplete, onStart, onFinish, onNot
         </div>
         {/* Info */}
         <div style={{ flex:1, minWidth:0 }}>
-          <div style={{ fontSize:13, fontWeight:700, color:T.textPrimary, marginBottom:1 }}>{b.firstName} {b.lastName}</div>
-          <div style={{ fontSize:11, fontWeight:600, color:s.color, textTransform:"uppercase", letterSpacing:"0.04em", marginBottom:b.tireSize?2:0 }}>{displaySvc(b)}</div>
-          {b.tireSize && <div style={{ fontSize:10, color:T.textMuted, display:"flex", alignItems:"center", gap:4 }}><TireIcon size={10} color={T.textMuted}/>{b.tireSize}</div>}
+          <div style={{ fontSize:13, fontWeight:700, color:T.textPrimary, marginBottom:1, display:"flex", alignItems:"center", gap:6 }}>
+            {b.firstName} {b.lastName}
+            <SourceTag source={b.source}/>
+          </div>
+          <div style={{ fontSize:11, fontWeight:600, color:s.color, textTransform:"uppercase", letterSpacing:"0.04em", marginBottom:(b.tireSize||b.tireQuantity)?3:0 }}>{displaySvc(b)}</div>
+          {(b.tireSize || b.tireQuantity) && (
+            <div style={{ fontSize:14, fontWeight:700, color:T.textSecond, display:"flex", alignItems:"center", gap:5 }}>
+              <TireIcon size={13} color={T.orange}/>
+              {b.tireSize || "—"}{b.tireQuantity ? ` · ${b.tireQuantity} tires` : ""}
+            </div>
+          )}
           {b.phone && <div style={{ fontSize:10, color:T.textMuted, marginTop:1 }}>{b.phone}</div>}
         </div>
         {bay ? <BayPill kind={bay}/> : <Badge status={b.status}/>}
@@ -163,12 +184,20 @@ function QueueRow({ b, onConfirm, onCancel, onComplete, onStart, onFinish, onNot
           )}
         </div>
       </div>
+      {/* Admin/customer note — visible to all roles (incl. mechanic) if set */}
+      {b.notes && (
+        <div style={{ margin:"0 16px 10px", padding:"7px 10px", background:T.elevated, borderRadius:T.r8,
+          display:"flex", alignItems:"flex-start", gap:6, border:`1px solid ${T.border}` }}>
+          <NoteIcon size={11} color={T.textMuted}/>
+          <span style={{ fontSize:11, color:T.textSecond, lineHeight:1.5 }}><b style={{ color:T.textMuted }}>Note:</b> {b.notes}</span>
+        </div>
+      )}
       {/* Mechanic notes — visible to all roles if set */}
       {b.mechanicNotes && (
         <div style={{ margin:"0 16px 10px", padding:"7px 10px", background:T.elevated, borderRadius:T.r8,
           display:"flex", alignItems:"flex-start", gap:6, border:`1px solid ${T.border}` }}>
-          <WrenchIcon size={11} color={T.textMuted} style={{ flexShrink:0, marginTop:1 }}/>
-          <span style={{ fontSize:11, color:T.textSecond, lineHeight:1.5 }}>{b.mechanicNotes}</span>
+          <WrenchIcon size={11} color={T.textMuted}/>
+          <span style={{ fontSize:11, color:T.textSecond, lineHeight:1.5 }}><b style={{ color:T.textMuted }}>Mechanic:</b> {b.mechanicNotes}</span>
         </div>
       )}
     </div>
@@ -188,6 +217,11 @@ function MechanicNoteModal({ booking, onClose, onSave }) {
   return (
     <Modal onClose={onClose}>
       <ModalTitle sub={`${booking.firstName} ${booking.lastName} — ${booking.service}`}>Mechanic Note</ModalTitle>
+      {booking.notes && (
+        <div style={{ fontSize:12, color:getT().textSecond, marginBottom:12, background:getT().elevated, padding:"8px 11px", borderRadius:getT().r8, border:`1px solid ${getT().border}` }}>
+          <b style={{ color:getT().textMuted }}>Note from front desk:</b> {booking.notes}
+        </div>
+      )}
       <textarea value={note} onChange={e => setNote(e.target.value)} rows={4}
         placeholder="Add a note about this job…"
         style={{ width:"100%", background:getT().pageBg, border:`1.5px solid ${getT().border}`,
@@ -210,7 +244,7 @@ function WalkInModal({ onClose, onSave, services }) {
   const [form, setForm] = useState({
     firstName:"", lastName:"", phone:"", email:"",
     service:svcList[0], date:todayIso, time:"",
-    tireSize:"", status:"confirmed",
+    tireSize:"", tireQuantity:"", price:"", status:"confirmed",
   });
   const [slots,        setSlots]        = useState([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
@@ -268,7 +302,7 @@ function WalkInModal({ onClose, onSave, services }) {
   };
 
   return (
-    <Modal onClose={onClose} wide>
+    <Modal onClose={onClose} wide persistent>
       <ModalTitle sub="Creates a confirmed booking directly — no Shopify form needed">Walk-in / Manual Booking</ModalTitle>
       {err && <div style={{ background:T.redBg, border:`1px solid ${T.redBorder}`, borderRadius:T.r8, padding:"9px 12px", fontSize:12, color:T.redText, marginBottom:12 }}>{err}</div>}
       <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:12 }}>
@@ -297,11 +331,15 @@ function WalkInModal({ onClose, onSave, services }) {
             <Sel value={form.time} onChange={e=>sf("time",e.target.value)} options={slots.map(t=>({value:t,label:t}))}/>
           )}
         </div>
-        <div><Lbl>Tire size</Lbl><Inp value={form.tireSize} onChange={e=>sf("tireSize",e.target.value)} placeholder="225/65R17"/></div>
+        <div><Lbl>Tire size</Lbl><Inp value={form.tireSize} onChange={e=>sf("tireSize",formatTireSize(e.target.value))} placeholder="225/65R17" style={{ fontSize:16, fontWeight:600, letterSpacing:"0.02em" }}/></div>
       </div>
-      <div style={{ marginBottom:16 }}>
-        <Lbl>Initial status</Lbl>
-        <Sel value={form.status} onChange={e=>sf("status",e.target.value)} options={[{value:"confirmed",label:"Confirmed"},{value:"pending",label:"Pending"}]}/>
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:12, marginBottom:16 }}>
+        <div><Lbl>How many tires</Lbl><Inp type="number" value={form.tireQuantity} onChange={e=>sf("tireQuantity",e.target.value)} placeholder="e.g. 4"/></div>
+        <div><Lbl>Price ($)</Lbl><Inp type="number" value={form.price} onChange={e=>sf("price",e.target.value)} placeholder="0.00"/></div>
+        <div>
+          <Lbl>Initial status</Lbl>
+          <Sel value={form.status} onChange={e=>sf("status",e.target.value)} options={[{value:"confirmed",label:"Confirmed"},{value:"pending",label:"Pending"}]}/>
+        </div>
       </div>
       <div style={{ display:"flex", gap:8, paddingTop:14, borderTop:`1px solid ${T.border}` }}>
         <Btn onClick={handleSave} disabled={busy || slotsLoading || slots.length === 0} icon={<CheckIcon size={13} color="#fff"/>}>{busy?"Creating…":"Create Booking"}</Btn>
@@ -476,7 +514,15 @@ export default function TodayPage({ onAlert }) {
           services={services}
           onClose={() => setShowWalkIn(false)}
           onSave={async (form) => {
-            await createWalkIn(form);
+            const { price, tireQuantity, ...rest } = form;
+            const body = { ...rest };
+            if (tireQuantity !== "" && tireQuantity != null) body.tireQuantity = parseInt(tireQuantity, 10);
+            const res = await createWalkIn(body);
+            // Price isn't part of /book — record it as a payment on the new booking.
+            if (price !== "" && price != null && res?.booking?.id) {
+              try { await updatePayment(res.booking.id, { finalPrice: parseFloat(price), paymentStatus: "paid" }); }
+              catch (e) { onAlert?.("Booking made, but price didn't save: " + e.message, "error"); }
+            }
             onAlert?.("Walk-in booking created");
             setShowWalkIn(false);
             load();

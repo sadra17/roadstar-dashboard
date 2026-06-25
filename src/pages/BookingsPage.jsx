@@ -1,7 +1,7 @@
 // pages/BookingsPage.jsx
 import { useState, useEffect, useCallback } from "react";
 import { fetchBookings, fetchRecentlyDeleted, updateBooking, deleteBooking, restoreBooking, sendSMS, updatePayment, getUserRole } from "../api.js";
-import { getT, sm, displaySvc, effectiveOcc, fmtDate, todayStr } from "../theme.js";
+import { getT, sm, displaySvc, effectiveOcc, fmtDate, todayStr, formatTireSize } from "../theme.js";
 import { Badge, Btn, IBtn, Modal, ModalTitle, Inp, Sel, PageHeader, Spinner, Empty, Card, CompleteOrderModal, SearchIcon, RefreshIcon, CheckIcon, XIcon, FlagIcon, MsgIcon, TrashIcon, PenIcon, NoteIcon, RestoreIcon, PlusIcon, DownloadIcon } from "../components.jsx";
 
 
@@ -187,7 +187,23 @@ export default function BookingsPage({ onAlert }) {
       {/* Edit modal */}
       {editB && editMode === "edit" && (
         <EditModal booking={editB} onClose={() => setEditB(null)}
-          onSave={async (id, u) => { await handleUpdate(id, u); setEditB(null); }}/>
+          onSave={async (id, u) => {
+            const { price, paymentMethod, tireQuantity, ...fields } = u;
+            const bookingFields = { ...fields };
+            bookingFields.tireQuantity = tireQuantity === "" || tireQuantity == null ? null : parseInt(tireQuantity, 10);
+            await handleUpdate(id, bookingFields);
+            // Price/method live on the payment endpoint — save them if provided.
+            if ((price !== "" && price != null) || paymentMethod) {
+              try {
+                const payUpd = {};
+                if (price !== "" && price != null) payUpd.finalPrice = parseFloat(price);
+                if (paymentMethod) payUpd.paymentMethod = paymentMethod;
+                const updated = await updatePayment(id, payUpd);
+                setBookings(p => p.map(x => x.id === id ? updated : x));
+              } catch (e) { onAlert?.("Saved, but price didn't update: " + e.message, "error"); }
+            }
+            setEditB(null);
+          }}/>
       )}
 
       {/* Complete modal — forces price + payment method before confirming */}
@@ -270,25 +286,46 @@ export default function BookingsPage({ onAlert }) {
 
 function EditModal({ booking: b, onClose, onSave }) {
   const T = getT();
-  const [form, setForm] = useState({ status:b.status, date:b.date, time:b.time, notes:b.notes||"", tireSize:b.tireSize||"", doesntKnowTireSize:b.doesntKnowTireSize||false });
+  const [form, setForm] = useState({
+    firstName:b.firstName||"", lastName:b.lastName||"", phone:b.phone||"", email:b.email||"",
+    status:b.status, date:b.date, time:b.time, notes:b.notes||"",
+    tireSize:b.tireSize||"", tireQuantity:b.tireQuantity ?? "",
+    price:b.finalPrice ?? "", paymentMethod:b.paymentMethod || "",
+  });
   const [busy, setBusy] = useState(false);
   const set = (k,v) => setForm(p=>({...p,[k]:v}));
+  const Lbl = ({ children }) => (
+    <label style={{ fontSize:11, color:T.textMuted, display:"block", marginBottom:4, textTransform:"uppercase", letterSpacing:"0.06em", fontWeight:600 }}>{children}</label>
+  );
   return (
-    <Modal onClose={onClose}>
-      <ModalTitle>Edit Appointment</ModalTitle>
+    <Modal onClose={onClose} persistent>
+      <ModalTitle sub={displaySvc(b)}>Edit Booking</ModalTitle>
       <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-        <div><label style={{ fontSize:11, color:T.textMuted, display:"block", marginBottom:4, textTransform:"uppercase", letterSpacing:"0.06em", fontWeight:600 }}>Status</label>
-          <Sel value={form.status} onChange={e=>set("status",e.target.value)} options={["pending","confirmed","waitlist","completed","cancelled","no_show"].map(s=>({value:s,label:s}))}/>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+          <div><Lbl>First name</Lbl><Inp value={form.firstName} onChange={e=>set("firstName",e.target.value)} placeholder="John"/></div>
+          <div><Lbl>Last name</Lbl><Inp value={form.lastName} onChange={e=>set("lastName",e.target.value)} placeholder="Smith"/></div>
+          <div><Lbl>Phone</Lbl><Inp type="tel" value={form.phone} onChange={e=>set("phone",e.target.value)} placeholder="+1 (416) 555-0000"/></div>
+          <div><Lbl>Email</Lbl><Inp type="email" value={form.email} onChange={e=>set("email",e.target.value)} placeholder="optional"/></div>
+        </div>
+        <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr", gap:10 }}>
+          <div><Lbl>Tire size</Lbl><Inp value={form.tireSize} onChange={e=>set("tireSize",formatTireSize(e.target.value))} placeholder="225/65R17" style={{ fontSize:16, fontWeight:600, letterSpacing:"0.02em" }}/></div>
+          <div><Lbl>How many tires</Lbl><Inp type="number" value={form.tireQuantity} onChange={e=>set("tireQuantity",e.target.value)} placeholder="e.g. 4"/></div>
         </div>
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
-          <div><label style={{ fontSize:11, color:T.textMuted, display:"block", marginBottom:4, textTransform:"uppercase", letterSpacing:"0.06em", fontWeight:600 }}>Date</label>
-            <Inp type="date" value={form.date} onChange={e=>set("date",e.target.value)} style={{ colorScheme:"dark" }}/>
-          </div>
-          <div><label style={{ fontSize:11, color:T.textMuted, display:"block", marginBottom:4, textTransform:"uppercase", letterSpacing:"0.06em", fontWeight:600 }}>Time</label>
-            <Sel value={form.time} onChange={e=>set("time",e.target.value)} options={TIME_SLOTS.map(t=>({value:t,label:t}))}/>
+          <div><Lbl>Price ($)</Lbl><Inp type="number" value={form.price} onChange={e=>set("price",e.target.value)} placeholder="0.00"/></div>
+          <div><Lbl>Payment method</Lbl>
+            <Sel value={form.paymentMethod} onChange={e=>set("paymentMethod",e.target.value)}
+              options={[{value:"",label:"—"},{value:"cash",label:"Cash"},{value:"card",label:"Card"},{value:"cheque",label:"Cheque"},{value:"e-transfer",label:"e-Transfer"},{value:"other",label:"Other"}]}/>
           </div>
         </div>
-        <div><label style={{ fontSize:11, color:T.textMuted, display:"block", marginBottom:4, textTransform:"uppercase", letterSpacing:"0.06em", fontWeight:600 }}>Notes</label>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10 }}>
+          <div><Lbl>Status</Lbl>
+            <Sel value={form.status} onChange={e=>set("status",e.target.value)} options={["pending","confirmed","waitlist","completed","cancelled","no_show"].map(s=>({value:s,label:s}))}/>
+          </div>
+          <div><Lbl>Date</Lbl><Inp type="date" value={form.date} onChange={e=>set("date",e.target.value)} style={{ colorScheme:"dark" }}/></div>
+          <div><Lbl>Time</Lbl><Sel value={form.time} onChange={e=>set("time",e.target.value)} options={TIME_SLOTS.map(t=>({value:t,label:t}))}/></div>
+        </div>
+        <div><Lbl>Notes</Lbl>
           <textarea value={form.notes} onChange={e=>set("notes",e.target.value)} rows={2}
             style={{ width:"100%", background:T.pageBg, border:`1.5px solid ${T.border}`, borderRadius:T.r8, padding:"9px 12px", color:T.textPrimary, fontSize:13, fontFamily:T.font, outline:"none", boxSizing:"border-box", resize:"vertical" }}/>
         </div>
