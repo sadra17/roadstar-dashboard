@@ -2,7 +2,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { fetchBookings, fetchRecentlyDeleted, updateBooking, deleteBooking, restoreBooking, sendSMS, updatePayment, getUserRole } from "../api.js";
 import { getT, sm, displaySvc, effectiveOcc, fmtDate, todayStr, formatTireSize, money } from "../theme.js";
-import { Badge, Btn, IBtn, Modal, ModalTitle, Inp, Sel, PageHeader, Spinner, Empty, Card, CompleteOrderModal, SearchIcon, RefreshIcon, CheckIcon, XIcon, FlagIcon, MsgIcon, TrashIcon, PenIcon, NoteIcon, RestoreIcon, PlusIcon, DownloadIcon } from "../components.jsx";
+import { Badge, Btn, IBtn, Modal, ModalTitle, Inp, Sel, PageHeader, Spinner, Empty, Card, CompleteOrderModal, SearchIcon, RefreshIcon, CheckIcon, XIcon, FlagIcon, MsgIcon, TrashIcon, PenIcon, NoteIcon, RestoreIcon, PlusIcon, DownloadIcon, ClipboardCheckIcon } from "../components.jsx";
+import InspectionModal from "../InspectionReport.jsx";
 
 
 const DollarIcon = ({ size=14, color="currentColor" }) => (
@@ -26,7 +27,7 @@ const TIME_SLOTS = (() => {
   return s;
 })();
 
-function BookingRow({ b, onUpdate, onDelete, onSMS, onEdit, onPayment, onAlert, onCancel, onConfirm, readOnly }) {
+function BookingRow({ b, onUpdate, onDelete, onSMS, onEdit, onPayment, onAlert, onCancel, onConfirm, onInspect, readOnly }) {
   const T = getT(); const s = sm(b.status); const [busy, setBusy] = useState(false);
   const act = async (updates) => { setBusy(true); try { await onUpdate(b.id, updates); } catch (e) { onAlert?.(e.message,"error"); } finally { setBusy(false); } };
   return (
@@ -54,6 +55,7 @@ function BookingRow({ b, onUpdate, onDelete, onSMS, onEdit, onPayment, onAlert, 
           {!["completed","cancelled"].includes(b.status) && <IBtn v="complete" title="Mark Complete" onClick={() => onEdit(b,"complete")} disabled={busy}><FlagIcon size={14}/></IBtn>}
           {!["cancelled","completed"].includes(b.status) && <IBtn v="decline" title="Cancel" onClick={() => onCancel && onCancel(b)} disabled={busy}><XIcon size={14}/></IBtn>}
           <IBtn v="sms"   title="Send SMS" onClick={() => onSMS(b)}    disabled={busy}><MsgIcon size={14}/></IBtn>
+          <IBtn v={b.inspection ? "complete" : "edit"} title={b.inspection ? "Inspection Report (saved)" : "Inspection Report"} onClick={() => onInspect(b)} disabled={busy}><ClipboardCheckIcon size={14}/></IBtn>
           <IBtn v="edit"  title="Edit"     onClick={() => onEdit(b)}     disabled={busy}><PenIcon size={14}/></IBtn>
           <IBtn v="sms"   title="Payment"  onClick={() => onPayment(b)}   disabled={busy}><DollarIcon size={14}/></IBtn>
           <IBtn v="trash" title="Delete"   onClick={() => onDelete(b.id)} disabled={busy}><TrashIcon size={14}/></IBtn>
@@ -78,6 +80,7 @@ export default function BookingsPage({ onAlert }) {
   const [deleteId,   setDeleteId]   = useState(null);
   const [confirmAct, setConfirmAct] = useState(null); // {id, type:'cancel'|'confirm'}
   const [smsB,       setSmsB]      = useState(null);
+  const [inspectB,   setInspectB]  = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -180,10 +183,18 @@ export default function BookingsPage({ onAlert }) {
                   onAlert={onAlert}
                   onCancel={b=>setConfirmAct({id:b.id,type:"cancel",name:`${b.firstName} ${b.lastName}`})}
                   onConfirm={b=>setConfirmAct({id:b.id,type:"confirm",name:`${b.firstName} ${b.lastName}`})}
+                  onInspect={setInspectB}
                 />
               ))
           }
         </div>
+      )}
+
+      {/* Inspection report modal */}
+      {inspectB && (
+        <InspectionModal booking={inspectB} onClose={() => setInspectB(null)} onAlert={onAlert}
+          onSaved={u => { setBookings(p => p.map(b => b.id === u.id ? u : b)); setInspectB(u); }}
+        />
       )}
 
       {/* Edit modal */}

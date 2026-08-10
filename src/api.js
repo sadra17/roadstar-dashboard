@@ -87,6 +87,8 @@ export const baySnooze           = (id)      => api(`/bookings/${id}/bay-snooze`
 export const bayStart            = (id)      => api(`/bookings/${id}/bay-start`, { method: "PATCH" }).then(d => d.booking);
 export const bayEnd              = (id)      => api(`/bookings/${id}/bay-end`, { method: "PATCH" });
 export const sendSMS             = (id, t)   => api(`/bookings/${id}/sms`, { method: "POST", body: JSON.stringify({ messageType: t }) });
+export const saveInspection      = (id, data)  => api(`/bookings/${id}/inspection`, { method: "PATCH", body: JSON.stringify(data) }).then(d => d.booking);
+export const emailInspection     = (id, email) => api(`/bookings/${id}/inspection/email`, { method: "POST", body: JSON.stringify(email ? { email } : {}) });
 
 // ── Live Bay ──────────────────────────────────────────────────────────────────
 export const fetchLiveBay = () => api("/live-bay");
