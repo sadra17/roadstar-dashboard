@@ -1,7 +1,7 @@
 // pages/CustomersPage.jsx — no emoji, SVG icons
 import { useState, useEffect, useCallback } from "react";
 import { fetchCustomers, fetchCustomerByPhone, exportCustomersCSV } from "../api.js";
-import { getT, displaySvc } from "../theme.js";
+import { getT, displaySvc, money } from "../theme.js";
 import { Badge, Btn, Modal, ModalTitle, PageHeader, Spinner } from "../components.jsx";
 import { SearchIcon, DownloadIcon, UsersIcon } from "../components.jsx";
 
@@ -70,7 +70,7 @@ function CustomerRow({ c, onClick }) {
       {/* Stats */}
       <div style={{ textAlign:"right", flexShrink:0 }}>
         <div style={{ fontSize:13, fontWeight:700, color:T.textPrimary }}>{c.visitCount} visit{c.visitCount!==1?"s":""}</div>
-        {c.totalSpent > 0 && <div style={{ fontSize:11, color:T.green }}>${c.totalSpent.toFixed(2)}</div>}
+        {c.totalSpent > 0 && <div style={{ fontSize:11, color:T.green }}>{money(c.totalSpent, 2)}</div>}
         <div style={{ fontSize:10, color:T.textMuted, marginTop:1 }}>Last: {c.lastVisit}</div>
       </div>
     </button>
@@ -98,7 +98,7 @@ function CustomerProfile({ customer: c }) {
         <Stat label="Total visits"  value={c.visitCount}      color={T.blue}/>
         <Stat label="Completed"     value={c.completedCount}  color={T.green}/>
         <Stat label="No-shows"      value={c.noShowCount||0}  color={T.red}/>
-        <Stat label="Total spent"   value={c.totalSpent > 0 ? `$${c.totalSpent.toFixed(2)}` : "—"} color={T.teal}/>
+        <Stat label="Total spent"   value={c.totalSpent > 0 ? money(c.totalSpent, 2) : "—"} color={T.teal}/>
       </div>
 
       {/* Tire sizes */}
@@ -128,7 +128,7 @@ function CustomerProfile({ customer: c }) {
                 </div>
                 <div style={{ textAlign:"right", flexShrink:0, marginLeft:10 }}>
                   <Badge status={b.status}/>
-                  {b.finalPrice && <div style={{ fontSize:10, color:T.green, marginTop:4 }}>${b.finalPrice}</div>}
+                  {b.finalPrice && <div style={{ fontSize:10, color:T.green, marginTop:4 }}>{money(b.finalPrice)}</div>}
                 </div>
               </div>
             ))}

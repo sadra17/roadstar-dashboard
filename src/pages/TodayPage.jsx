@@ -13,6 +13,10 @@ const bayState = (b) => {
   return null;
 };
 
+// Terms & Conditions page shown to walk-in customers. Override with
+// VITE_TERMS_URL in the dashboard env; falls back to the public site page.
+const TERMS_URL = import.meta.env.VITE_TERMS_URL || "https://roadstartire.ca/pages/terms-and-conditions";
+
 // Walk-in uses POST /api/book directly (same as Shopify form)
 async function createWalkIn(form) {
   const BASE = import.meta.env.VITE_API_URL || "https://roadstar-api.onrender.com/api";
@@ -245,6 +249,7 @@ function WalkInModal({ onClose, onSave, services }) {
     firstName:"", lastName:"", phone:"", email:"",
     service:svcList[0], date:todayIso, time:"",
     tireSize:"", tireQuantity:"", price:"", status:"confirmed",
+    termsAgreed:false,
   });
   const [slots,        setSlots]        = useState([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
@@ -294,6 +299,7 @@ function WalkInModal({ onClose, onSave, services }) {
       setErr("First name, last name and phone are required"); return;
     }
     if (!form.time) { setErr("Please select an available time slot"); return; }
+    if (!form.termsAgreed) { setErr("Please confirm the customer agrees to the Terms & Conditions"); return; }
     setBusy(true); setErr("");
     try {
       await onSave(form);
@@ -341,8 +347,17 @@ function WalkInModal({ onClose, onSave, services }) {
           <Sel value={form.status} onChange={e=>sf("status",e.target.value)} options={[{value:"confirmed",label:"Confirmed"},{value:"pending",label:"Pending"}]}/>
         </div>
       </div>
+      <label style={{ display:"flex", alignItems:"flex-start", gap:8, marginBottom:16, cursor:"pointer" }}>
+        <input type="checkbox" checked={form.termsAgreed} onChange={e=>sf("termsAgreed", e.target.checked)}
+          style={{ width:15, height:15, flexShrink:0, marginTop:1, accentColor:T.blue }}/>
+        <span style={{ fontSize:12, color:T.textMuted, lineHeight:1.5 }}>
+          Customer agrees to the{" "}
+          <a href={TERMS_URL} target="_blank" rel="noopener" onClick={e=>e.stopPropagation()}
+            style={{ color:T.blue, textDecoration:"underline", fontWeight:600 }}>Terms &amp; Conditions</a>.
+        </span>
+      </label>
       <div style={{ display:"flex", gap:8, paddingTop:14, borderTop:`1px solid ${T.border}` }}>
-        <Btn onClick={handleSave} disabled={busy || slotsLoading || slots.length === 0} icon={<CheckIcon size={13} color="#fff"/>}>{busy?"Creating…":"Create Booking"}</Btn>
+        <Btn onClick={handleSave} disabled={busy || slotsLoading || slots.length === 0 || !form.termsAgreed} icon={<CheckIcon size={13} color="#fff"/>}>{busy?"Creating…":"Create Booking"}</Btn>
         <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
       </div>
     </Modal>

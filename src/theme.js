@@ -150,6 +150,17 @@ export function todayStr() {
   return new Date().toISOString().slice(0, 10);
 }
 
+// Format a dollar amount with thousands separators, e.g. 66243 → "$66,243".
+// Pass decimals (0 or 2) to force that many; default trims to whole dollars
+// when there are no cents, otherwise shows 2 decimals.
+export function money(n, decimals) {
+  const num = Number(n) || 0;
+  const opts = decimals != null
+    ? { minimumFractionDigits: decimals, maximumFractionDigits: decimals }
+    : { minimumFractionDigits: 0, maximumFractionDigits: 2 };
+  return "$" + num.toLocaleString("en-US", opts);
+}
+
 // Auto-format a tire size as the user types: inserts the "/" and "R" so that
 // e.g. "2256517" becomes "225/65R17". Letters are upper-cased. Anything that
 // isn't a plain ###/##R## sequence is left mostly as typed (just upper-cased)

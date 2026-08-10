@@ -1,7 +1,7 @@
 // pages/AnalyticsPage.jsx — no emoji, SVG icons
 import { useState, useEffect } from "react";
 import { fetchAnalyticsSummary, fetchAnalyticsByDay, fetchAnalyticsByService, fetchAnalyticsByPayment } from "../api.js";
-import { getT } from "../theme.js";
+import { getT, money } from "../theme.js";
 import { PageHeader, Spinner, StatCard } from "../components.jsx";
 
 const Ic = ({ size=16, color="currentColor", ch }) => (
@@ -24,7 +24,7 @@ function HBar({ label, value, max, color, suffix="" }) {
         <div style={{ height:"100%", width:`${pct}%`, background:color, opacity:0.75, borderRadius:T.r6, minWidth:pct>0?4:0, transition:"width .4s ease" }}/>
         {value > 0 && (
           <span style={{ position:"absolute", right:8, top:"50%", transform:"translateY(-50%)", fontSize:11, fontWeight:600, color:T.textPrimary }}>
-            {typeof value === "number" && suffix === "$" ? `$${value.toFixed(0)}` : `${value}${suffix}`}
+            {typeof value === "number" && suffix === "$" ? money(value, 0) : `${value}${suffix}`}
           </span>
         )}
       </div>
@@ -45,7 +45,7 @@ function RevenueChart({ days }) {
           const isOk = (d.revenue || 0) > 0;
           return (
             <div key={i} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:0, position:"relative" }}
-              title={`${d.date}: ${d.bookings} bookings · $${(d.revenue||0).toFixed(2)}`}>
+              title={`${d.date}: ${d.bookings} bookings · ${money(d.revenue||0, 2)}`}>
               <div style={{ width:"100%", height:h, background:isOk ? T.blue : T.border, borderRadius:`${T.r6} ${T.r6} 0 0`, opacity:0.7 }}/>
               <div style={{ fontSize:8, color:T.textMuted, transform:"rotate(-45deg)", transformOrigin:"top left", marginTop:4, whiteSpace:"nowrap", paddingLeft:2 }}>
                 {d.date.slice(5)}
@@ -113,8 +113,8 @@ export default function AnalyticsPage({ onAlert }) {
             <StatCard label="Confirmed"      value={summary?.totals?.confirmed || 0}   accent={T.green}  icon={<FlagIcon2  size={14} color={T.green}/>}/>
             <StatCard label="Completed"      value={summary?.totals?.completed || 0}   accent={T.teal}   icon={<TrendIcon  size={14} color={T.teal}/>}/>
             <StatCard label="No-shows"       value={summary?.totals?.no_show || 0}     accent={T.red}    icon={<NoIcon     size={14} color={T.red}/>}/>
-            <StatCard label="Revenue"        value={`$${(summary?.revenue?.total||0).toFixed(0)}`}        accent={T.amber}  icon={<DollarIcon size={14} color={T.amber}/>}/>
-            <StatCard label="Avg ticket"     value={`$${(summary?.revenue?.avgTicket||0).toFixed(0)}`}    accent={T.purple} icon={<DollarIcon size={14} color={T.purple}/>}/>
+            <StatCard label="Revenue"        value={money(summary?.revenue?.total||0, 0)}        accent={T.amber}  icon={<DollarIcon size={14} color={T.amber}/>}/>
+            <StatCard label="Avg ticket"     value={money(summary?.revenue?.avgTicket||0, 0)}    accent={T.purple} icon={<DollarIcon size={14} color={T.purple}/>}/>
           </div>
 
           {/* Revenue chart */}
@@ -122,7 +122,7 @@ export default function AnalyticsPage({ onAlert }) {
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
               <div style={{ fontSize:13, fontWeight:600, color:T.textPrimary }}>Daily revenue</div>
               <div style={{ fontSize:11, color:T.textMuted }}>
-                ${(summary?.revenue?.total||0).toFixed(2)} total · {summary?.revenue?.paidCount||0} paid
+                {money(summary?.revenue?.total||0, 2)} total · {summary?.revenue?.paidCount||0} paid
               </div>
             </div>
             <RevenueChart days={days}/>

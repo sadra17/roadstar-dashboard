@@ -1,7 +1,7 @@
 // pages/BookingsPage.jsx
 import { useState, useEffect, useCallback } from "react";
 import { fetchBookings, fetchRecentlyDeleted, updateBooking, deleteBooking, restoreBooking, sendSMS, updatePayment, getUserRole } from "../api.js";
-import { getT, sm, displaySvc, effectiveOcc, fmtDate, todayStr, formatTireSize } from "../theme.js";
+import { getT, sm, displaySvc, effectiveOcc, fmtDate, todayStr, formatTireSize, money } from "../theme.js";
 import { Badge, Btn, IBtn, Modal, ModalTitle, Inp, Sel, PageHeader, Spinner, Empty, Card, CompleteOrderModal, SearchIcon, RefreshIcon, CheckIcon, XIcon, FlagIcon, MsgIcon, TrashIcon, PenIcon, NoteIcon, RestoreIcon, PlusIcon, DownloadIcon } from "../components.jsx";
 
 
@@ -45,7 +45,7 @@ function BookingRow({ b, onUpdate, onDelete, onSMS, onEdit, onPayment, onAlert, 
       </div>
       <div style={{textAlign:"right",flexShrink:0}}>
         <Badge status={b.status}/>
-        {b.finalPrice!=null&&<div style={{fontSize:12,fontWeight:700,color:T.green,marginTop:4}}>${b.finalPrice} <span style={{fontSize:10,color:T.textMuted,fontWeight:400}}>{b.paymentStatus||"unpaid"}</span></div>}
+        {b.finalPrice!=null&&<div style={{fontSize:12,fontWeight:700,color:T.green,marginTop:4}}>{money(b.finalPrice)} <span style={{fontSize:10,color:T.textMuted,fontWeight:400}}>{b.paymentStatus||"unpaid"}</span></div>}
       </div>
       {/* Mechanics see bookings read-only — no action buttons */}
       {!readOnly && (
@@ -113,7 +113,9 @@ export default function BookingsPage({ onAlert }) {
     filtered = filtered.filter(b => `${b.firstName} ${b.lastName}`.toLowerCase().includes(q) || b.phone.includes(q) || (b.email||"").toLowerCase().includes(q));
   }
   const active    = filtered.filter(b => !["completed","cancelled"].includes(b.status));
-  const completed = filtered.filter(b => b.status === "completed");
+  // Completed: most recently completed at the top
+  const completed = filtered.filter(b => b.status === "completed")
+    .sort((a, b) => new Date(b.completedAt || `${b.date}T00:00:00`) - new Date(a.completedAt || `${a.date}T00:00:00`));
   const shown     = tab === "active" ? active : tab === "completed" ? completed : deleted;
 
   return (
