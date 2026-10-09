@@ -4,6 +4,9 @@ import { fetchAuditLog } from "../api.js";
 import { getT } from "../theme.js";
 import { PageHeader, Spinner, Empty, Card, SearchIcon } from "../components.jsx";
 
+// Long before/after values are shortened with an ellipsis; hover shows the full value
+const clip40 = v => v == null ? v : (v.length > 40 ? v.slice(0, 39) + "…" : v);
+
 export function AuditLogPage({ onAlert }) {
   const T = getT();
   const [logs,    setLogs]    = useState([]);
@@ -69,15 +72,15 @@ export function AuditLogPage({ onAlert }) {
             <div key={l.id} style={{ background:T.cardBg, border:`1px solid ${T.border}`, borderRadius:T.r8, padding:"10px 14px", display:"flex", gap:12, alignItems:"flex-start" }}>
               <div style={{ width:10, height:10, borderRadius:"50%", background:ACTION_COLOR[l.action]||T.textMuted, flexShrink:0, marginTop:3 }}/>
               <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontSize:12, color:T.textPrimary }}>
+                <div style={{ fontSize:12, color:T.textPrimary, overflowWrap:"anywhere" }}>
                   <span style={{ fontWeight:600, color:ACTION_COLOR[l.action]||T.textSecond }}>{l.action}</span>
                   {" "}<span style={{ color:T.textMuted }}>{l.entity}</span>
                   {l.entityLabel && <span style={{ color:T.textSecond }}> — {l.entityLabel}</span>}
                 </div>
-                {l.field && <div style={{ fontSize:11, color:T.textMuted, marginTop:2 }}>
-                  {l.field}: <span style={{ color:T.red }}>{JSON.stringify(l.beforeValue)?.slice(0,40)}</span> → <span style={{ color:T.green }}>{JSON.stringify(l.afterValue)?.slice(0,40)}</span>
+                {l.field && <div style={{ fontSize:11, color:T.textMuted, marginTop:2, overflowWrap:"anywhere" }}>
+                  {l.field}: <span title={JSON.stringify(l.beforeValue)} style={{ color:T.red }}>{clip40(JSON.stringify(l.beforeValue))}</span> → <span title={JSON.stringify(l.afterValue)} style={{ color:T.green }}>{clip40(JSON.stringify(l.afterValue))}</span>
                 </div>}
-                <div style={{ fontSize:10, color:T.textMuted, marginTop:2 }}>{l.userName||l.userEmail||"system"} · {fmtTime(l.createdAt)}</div>
+                <div style={{ fontSize:10, color:T.textMuted, marginTop:2, overflowWrap:"anywhere" }}>{l.userName||l.userEmail||"system"} · {fmtTime(l.createdAt)}</div>
               </div>
             </div>
           ))}

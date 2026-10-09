@@ -147,6 +147,7 @@ export const fetchAnalyticsSummary   = (p = {}) => api(`/analytics/summary?${new
 export const fetchAnalyticsByDay     = (p = {}) => api(`/analytics/by-day?${new URLSearchParams(p)}`).then(d => d.days);
 export const fetchAnalyticsByService = (p = {}) => api(`/analytics/by-service?${new URLSearchParams(p)}`).then(d => d.services);
 export const fetchAnalyticsByPayment = (p = {}) => api(`/analytics/by-payment?${new URLSearchParams(p)}`);
+export const fetchAnalyticsOverview  = (p = {}) => api(`/analytics/overview?${new URLSearchParams(p)}`);
 
 // ── Settings ──────────────────────────────────────────────────────────────────
 export const fetchSettings    = ()  => api("/settings").then(d => d.settings);

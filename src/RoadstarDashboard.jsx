@@ -53,14 +53,14 @@ function AlertToast({ alerts, onDismiss }) {
   const T = getT();
   if (!alerts.length) return null;
   return (
-    <div style={{ position:"fixed", bottom:20, right:16, zIndex:9999, display:"flex", flexDirection:"column", gap:8, maxWidth:"calc(100vw - 32px)" }}>
+    <div className="rs-toasts" style={{ position:"fixed", bottom:20, right:16, zIndex:9999, display:"flex", flexDirection:"column", gap:8, maxWidth:"min(420px, calc(100vw - 32px))" }}>
       {alerts.map(a => (
         <div key={a.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 14px",
           background:a.type==="error"?T.redBg:T.greenBg, border:`1px solid ${a.type==="error"?T.redBorder:T.greenBorder}`,
           borderRadius:T.r10, color:a.type==="error"?T.redText:T.greenText, fontSize:13, fontWeight:500,
           boxShadow:"0 4px 20px rgba(0,0,0,.4)" }}>
-          <span style={{flex:1}}>{a.msg}</span>
-          <button onClick={() => onDismiss(a.id)} style={{ background:"none", border:"none", color:"inherit", cursor:"pointer", padding:0, opacity:0.7 }}>
+          <span style={{ flex:1, minWidth:0, overflowWrap:"anywhere", lineHeight:1.45 }}>{a.msg}</span>
+          <button onClick={() => onDismiss(a.id)} aria-label="Dismiss" style={{ background:"none", border:"none", color:"inherit", cursor:"pointer", padding:0, opacity:0.7, flexShrink:0, width:28, height:28, display:"flex", alignItems:"center", justifyContent:"center", marginRight:-6 }}>
             <XIcon s={14}/>
           </button>
         </div>
@@ -299,8 +299,8 @@ export default function RoadstarDashboard({ onLogout }) {
   function NewBookingBanner() {
     if (!newBanners.length) return null;
     return (
-      <div style={{ position:"fixed", top:16, right:16, zIndex:9998, display:"flex",
-        flexDirection:"column", gap:8, maxWidth:340, pointerEvents:"none" }}>
+      <div className="rs-newbk" style={{ position:"fixed", bottom:16, left:SIDEBAR_W + 16, zIndex:900, display:"flex",
+        flexDirection:"column", gap:8, width:340, maxWidth:"calc(100vw - 32px)", pointerEvents:"none" }}>
         {newBanners.map(({ id, booking: b }) => (
           <div key={id} style={{ display:"flex", alignItems:"stretch", gap:0,
             background: theme==="dark" ? "#0f1e35" : "#eef6ff",
@@ -360,8 +360,8 @@ export default function RoadstarDashboard({ onLogout }) {
                 <path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4"/>
               </svg>
             </div>
-            <div>
-              <div style={{ fontSize:13, fontWeight:800, color:T.textPrimary, letterSpacing:"0.04em" }}>{SHOP_LABEL}</div>
+            <div style={{ minWidth:0 }}>
+              <div style={{ fontSize:13, fontWeight:800, color:T.textPrimary, letterSpacing:"0.04em", overflowWrap:"anywhere" }}>{SHOP_LABEL}</div>
               <div style={{ fontSize:10, color:T.textMuted, letterSpacing:"0.1em" }}>ADMIN DASHBOARD</div>
             </div>
           </div>
@@ -432,7 +432,7 @@ export default function RoadstarDashboard({ onLogout }) {
   const currentLabel = nav.find(n => n.id === page)?.label || "Dashboard";
 
   return (
-    <div style={{ display:"flex", minHeight:"100vh", background:T.pageBg, fontFamily:T.font, overflowX:"hidden", position:"relative" }}>
+    <div style={{ display:"flex", minHeight:"100vh", background:T.pageBg, fontFamily:T.font, overflowX:"clip", position:"relative" }}>
 
       {/* ── Desktop sidebar — fixed so it never scrolls with the page ── */}
       <div style={{ width:SIDEBAR_W, height:"100vh", position:"fixed", left:0, top:0, overflowY:"auto", overscrollBehavior:"contain", borderRight:`1px solid ${T.border}`, background:T.sideBg || T.cardBg, zIndex:50 }}
@@ -465,7 +465,7 @@ export default function RoadstarDashboard({ onLogout }) {
               cursor:"pointer", color:T.textPrimary, flexShrink:0 }}>
             <MnuI s={16} c={T.textPrimary}/>
           </button>
-          <div style={{ fontSize:14, fontWeight:700, color:T.textPrimary, flex:1 }}>{currentLabel}</div>
+          <div style={{ fontSize:14, fontWeight:700, color:T.textPrimary, flex:1, minWidth:0, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{currentLabel}</div>
           <button onClick={handleTheme}
             style={{ background:T.elevated, border:`1px solid ${T.border}`, borderRadius:T.r8,
               width:36, height:36, display:"flex", alignItems:"center", justifyContent:"center",
@@ -488,6 +488,8 @@ export default function RoadstarDashboard({ onLogout }) {
           .rs-topbar { display: flex !important; }
           .rs-drawer-overlay { display: flex !important; }
           .rs-page-content { padding: 16px 14px 32px !important; }
+          /* phones: new-booking banner spans the bottom of the screen */
+          .rs-newbk { left: 16px !important; right: 16px !important; width: auto !important; }
         }
         @media (min-width: 768px) {
           .rs-topbar { display: none !important; }

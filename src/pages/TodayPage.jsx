@@ -79,7 +79,7 @@ function LiveCard({ b, onFinish, onSnooze, onExtend }) {
   return (
     <div style={{ background:T.cardBg, border:`1px solid ${isOver ? T.red : T.border}`, borderTop:`3px solid ${isOver ? T.red : accentColor}`, borderRadius:T.r12, padding:"16px" }}>
       {/* Bay + time */}
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
+      <div style={{ display:"flex", flexWrap:"wrap", justifyContent:"space-between", alignItems:"center", gap:8, marginBottom:10 }}>
         <span style={{ fontSize:10, fontWeight:700, letterSpacing:"0.07em", textTransform:"uppercase", color:accentColor }}>
           {bayLabel}
         </span>
@@ -93,8 +93,8 @@ function LiveCard({ b, onFinish, onSnooze, onExtend }) {
         <div style={{ height:"100%", width:`${pct}%`, background:isOver ? T.red : accentColor, borderRadius:2, transition:"width .5s" }}/>
       </div>
 
-      <div style={{ fontSize:14, fontWeight:700, color:T.textPrimary, marginBottom:2 }}>{b.firstName} {b.lastName}</div>
-      <div style={{ fontSize:11, fontWeight:600, color:accentColor, textTransform:"uppercase", letterSpacing:"0.04em", marginBottom:8 }}>{displaySvc(b)}</div>
+      <div style={{ fontSize:14, fontWeight:700, color:T.textPrimary, marginBottom:2, overflowWrap:"anywhere" }}>{b.firstName} {b.lastName}</div>
+      <div style={{ fontSize:11, fontWeight:600, color:accentColor, textTransform:"uppercase", letterSpacing:"0.04em", marginBottom:8, overflowWrap:"anywhere" }}>{displaySvc(b)}</div>
       {b._elapsedMinutes != null && <div style={{ fontSize:11, color:T.textMuted, marginBottom:8 }}>In shop {b._elapsedMinutes} min</div>}
 
       {b.tireSize && (
@@ -111,7 +111,7 @@ function LiveCard({ b, onFinish, onSnooze, onExtend }) {
         </div>
       )}
 
-      <div style={{ display:"flex", gap:5 }}>
+      <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
         <Btn small variant="success" icon={<FlagIcon size={12} color={T.green}/>} disabled={busy}
           onClick={async () => { setBusy(true); try { await onFinish(b); } finally { setBusy(false); } }}>{busy ? "…" : "Finished"}</Btn>
         <Btn small variant="amber" icon={<ClockIcon size={12} color={T.amber}/>} onClick={() => onExtend(b.id, 10)}>+10</Btn>
@@ -155,23 +155,23 @@ function QueueRow({ b, onConfirm, onCancel, onComplete, onStart, onFinish, onNot
   // Ready to start = confirmed, needs a bay, not already in/through a bay.
   const canStart = !bay && b.status === "confirmed" && b.resourcePool !== "none";
   // Phones: badge + action buttons drop to their own row under the details.
-  const narrow = useNarrow(600);
+  const narrow = useNarrow(900); // iPad portrait + sidebar leaves too little room for one line
   return (
     // borderLeft must come after the `border` shorthand or it gets overridden.
     <div style={{ background:T.cardBg, border:`1px solid ${T.border}`, borderLeft:`3px solid ${s.color}`, borderRadius:T.r10, opacity:busy?0.6:1 }}>
       <div style={{ display:"flex", flexWrap:"wrap", alignItems:"center", gap:narrow ? 10 : 12, padding:narrow ? "12px" : "12px 16px" }}>
-        {/* Time block */}
-        <div style={{ flexShrink:0, minWidth:60, textAlign:"center", padding:"7px 10px", background:T.elevated, borderRadius:T.r8, border:`1px solid ${T.border}` }}>
+        {/* Time block — fixed width so every row's details start at the same x */}
+        <div style={{ flexShrink:0, width:78, boxSizing:"border-box", textAlign:"center", padding:"7px 6px", whiteSpace:"nowrap", background:T.elevated, borderRadius:T.r8, border:`1px solid ${T.border}` }}>
           <div style={{ fontSize:13, fontWeight:800, color:T.textPrimary, letterSpacing:"-0.02em" }}>{b.time}</div>
           <div style={{ fontSize:9, color:T.textMuted, marginTop:1, fontVariantNumeric:"tabular-nums" }}>{effectiveOcc(b)}m</div>
         </div>
         {/* Info */}
         <div style={{ flex:1, minWidth:0 }}>
-          <div style={{ fontSize:13, fontWeight:700, color:T.textPrimary, marginBottom:1, display:"flex", flexWrap:"wrap", alignItems:"center", gap:6 }}>
-            {b.firstName} {b.lastName}
+          <div style={{ fontSize:13, fontWeight:700, color:T.textPrimary, marginBottom:1, display:"flex", flexWrap:"wrap", alignItems:"center", gap:6, overflowWrap:"anywhere" }}>
+            <span style={{ minWidth:0 }}>{b.firstName} {b.lastName}</span>
             <SourceTag source={b.source}/>
           </div>
-          <div style={{ fontSize:11, fontWeight:600, color:s.color, textTransform:"uppercase", letterSpacing:"0.04em", marginBottom:(b.tireSize||b.tireQuantity)?3:0 }}>{displaySvc(b)}</div>
+          <div style={{ fontSize:11, fontWeight:600, color:s.color, textTransform:"uppercase", letterSpacing:"0.04em", marginBottom:(b.tireSize||b.tireQuantity)?3:0, overflowWrap:"anywhere" }}>{displaySvc(b)}</div>
           {(b.tireSize || b.tireQuantity) && (
             <div style={{ fontSize:14, fontWeight:700, color:T.textSecond, display:"flex", alignItems:"center", gap:5 }}>
               <TireIcon size={13} color={T.orange}/>
@@ -180,16 +180,16 @@ function QueueRow({ b, onConfirm, onCancel, onComplete, onStart, onFinish, onNot
           )}
           {b.phone && <div style={{ fontSize:10, color:T.textMuted, marginTop:1, whiteSpace:"nowrap" }}>{b.phone}</div>}
         </div>
-        <div style={{ display:"flex", alignItems:"center", gap:8, flexShrink:0, ...(narrow ? { flexBasis:"100%", flexWrap:"wrap", paddingTop:10, borderTop:`1px solid ${T.border}` } : {}) }}>
+        <div style={{ display:"flex", alignItems:"center", gap:8, flexShrink:0, ...(narrow ? { flexBasis:"100%", flexWrap:"wrap", justifyContent:"space-between", paddingTop:10, borderTop:`1px solid ${T.border}` } : {}) }}>
         {bay ? <BayPill kind={bay}/> : <Badge status={b.status}/>}
-        <div style={{ display:"flex", gap:3, alignItems:"center", marginLeft:narrow ? "auto" : 0 }}>
+        <div style={{ display:"flex", gap:6, alignItems:"center", marginLeft:narrow ? "auto" : 0 }}>
           {/* Start / Finished — available to everyone, including mechanics */}
           {canStart && onStart && (
-            <Btn small variant="primary" icon={<BayIcon size={12} color="#fff"/>} disabled={busy}
+            <Btn small variant="primary" style={{ minHeight:38 }} icon={<BayIcon size={12} color="#fff"/>} disabled={busy}
               onClick={() => act(() => onStart(b))}>Start</Btn>
           )}
           {bay === "live" && onFinish && (
-            <Btn small variant="success" icon={<FlagIcon size={12} color={T.green}/>} disabled={busy}
+            <Btn small variant="success" style={{ minHeight:38 }} icon={<FlagIcon size={12} color={T.green}/>} disabled={busy}
               onClick={() => act(() => onFinish(b))}>Finished</Btn>
           )}
           {/* Mechanic: note button only — no booking actions */}
@@ -217,16 +217,16 @@ function QueueRow({ b, onConfirm, onCancel, onComplete, onStart, onFinish, onNot
       {b.notes && (
         <div style={{ margin:narrow ? "0 12px 10px" : "0 16px 10px", padding:"7px 10px", background:T.elevated, borderRadius:T.r8,
           display:"flex", alignItems:"flex-start", gap:6, border:`1px solid ${T.border}` }}>
-          <NoteIcon size={11} color={T.textMuted}/>
-          <span style={{ fontSize:11, color:T.textSecond, lineHeight:1.5 }}><b style={{ color:T.textMuted }}>Note:</b> {b.notes}</span>
+          <span style={{ display:"flex", marginTop:3 }}><NoteIcon size={11} color={T.textMuted}/></span>
+          <span style={{ fontSize:11, color:T.textSecond, lineHeight:1.5, minWidth:0, overflowWrap:"anywhere" }}><b style={{ color:T.textMuted }}>Note:</b> {b.notes}</span>
         </div>
       )}
       {/* Mechanic notes — visible to all roles if set */}
       {b.mechanicNotes && (
         <div style={{ margin:narrow ? "0 12px 10px" : "0 16px 10px", padding:"7px 10px", background:T.elevated, borderRadius:T.r8,
           display:"flex", alignItems:"flex-start", gap:6, border:`1px solid ${T.border}` }}>
-          <WrenchIcon size={11} color={T.textMuted}/>
-          <span style={{ fontSize:11, color:T.textSecond, lineHeight:1.5 }}><b style={{ color:T.textMuted }}>Mechanic:</b> {b.mechanicNotes}</span>
+          <span style={{ display:"flex", marginTop:3 }}><WrenchIcon size={11} color={T.textMuted}/></span>
+          <span style={{ fontSize:11, color:T.textSecond, lineHeight:1.5, minWidth:0, overflowWrap:"anywhere" }}><b style={{ color:T.textMuted }}>Mechanic:</b> {b.mechanicNotes}</span>
         </div>
       )}
     </div>
@@ -247,7 +247,7 @@ function MechanicNoteModal({ booking, onClose, onSave }) {
     <Modal onClose={onClose}>
       <ModalTitle sub={`${booking.firstName} ${booking.lastName} — ${booking.service}`}>Mechanic Note</ModalTitle>
       {booking.notes && (
-        <div style={{ fontSize:12, color:getT().textSecond, marginBottom:12, background:getT().elevated, padding:"8px 11px", borderRadius:getT().r8, border:`1px solid ${getT().border}` }}>
+        <div style={{ fontSize:12, color:getT().textSecond, marginBottom:12, background:getT().elevated, padding:"8px 11px", borderRadius:getT().r8, border:`1px solid ${getT().border}`, overflowWrap:"anywhere" }}>
           <b style={{ color:getT().textMuted }}>Note from front desk:</b> {booking.notes}
         </div>
       )}
@@ -256,7 +256,7 @@ function MechanicNoteModal({ booking, onClose, onSave }) {
         style={{ width:"100%", background:getT().pageBg, border:`1.5px solid ${getT().border}`,
           borderRadius:getT().r8, padding:"10px 12px", color:getT().textPrimary,
           fontSize:13, fontFamily:getT().font, outline:"none", boxSizing:"border-box", resize:"vertical" }}/>
-      <div style={{ display:"flex", gap:8, marginTop:12 }}>
+      <div style={{ display:"flex", flexWrap:"wrap", gap:8, marginTop:12 }}>
         <Btn onClick={async () => { setBusy(true); try { await onSave(booking.id, note); } finally { setBusy(false); } }}
           disabled={busy} icon={<CheckIcon size={13} color="#fff"/>}>{busy ? "Saving…" : "Save Note"}</Btn>
         <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
@@ -362,11 +362,11 @@ function WalkInModal({ onClose, onSave, services }) {
             <Sel value={form.time} onChange={e=>sf("time",e.target.value)} options={slots.map(t=>({value:t,label:t}))}/>
           )}
         </div>
-        <div><Lbl>Tire size</Lbl><Inp value={form.tireSize} onChange={e=>sf("tireSize",formatTireSize(e.target.value, e.target.selectionStart === e.target.value.length))} placeholder="225/65R17" style={{ fontSize:16, fontWeight:600, letterSpacing:"0.02em" }}/></div>
+        <div><Lbl>Tire size</Lbl><Inp value={form.tireSize} onChange={e=>sf("tireSize",formatTireSize(e.target.value, e.target.selectionStart === e.target.value.length))} placeholder="225/65R17" style={{ fontSize:16, fontWeight:600, letterSpacing:"0.02em", height:38, padding:"0 12px" }}/></div>
       </div>
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,150px),1fr))", gap:12, marginBottom:16 }}>
-        <div><Lbl>How many tires</Lbl><Inp type="number" value={form.tireQuantity} onChange={e=>sf("tireQuantity",e.target.value)} placeholder="e.g. 4"/></div>
-        <div><Lbl>Quoted price ($)</Lbl><Inp type="number" value={form.price} onChange={e=>sf("price",e.target.value)} placeholder="0.00"/></div>
+        <div><Lbl>How many tires</Lbl><Inp type="number" value={form.tireQuantity} onChange={e=>sf("tireQuantity",e.target.value)} placeholder="e.g. 4" style={{ height:38 }}/></div>
+        <div><Lbl>Quoted price ($)</Lbl><Inp type="number" value={form.price} onChange={e=>sf("price",e.target.value)} placeholder="0.00" style={{ height:38 }}/></div>
         <div>
           <Lbl>Initial status</Lbl>
           <Sel value={form.status} onChange={e=>sf("status",e.target.value)} options={[{value:"confirmed",label:"Confirmed"},{value:"pending",label:"Pending"}]}/>
@@ -381,7 +381,7 @@ function WalkInModal({ onClose, onSave, services }) {
             style={{ color:T.blue, textDecoration:"underline", fontWeight:600 }}>Terms &amp; Conditions</a>.
         </span>
       </label>
-      <div style={{ display:"flex", gap:8, paddingTop:14, borderTop:`1px solid ${T.border}` }}>
+      <div style={{ display:"flex", flexWrap:"wrap", gap:8, paddingTop:14, borderTop:`1px solid ${T.border}` }}>
         <Btn onClick={handleSave} disabled={busy || slotsLoading || slots.length === 0 || !form.termsAgreed} icon={<CheckIcon size={13} color="#fff"/>}>{busy?"Creating…":"Create Booking"}</Btn>
         <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
       </div>
@@ -486,7 +486,7 @@ export default function TodayPage({ onAlert }) {
       />
 
       {/* Stats */}
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))", gap:10, marginBottom:24 }}>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(110px,1fr))", gap:10, marginBottom:24 }}>
         <StatCard label="Active" value={counts.active}    accent={T.blue}   icon={<ArrowRIcon  size={14} color={T.blue}/>}/>
         <StatCard label="Confirmed" value={counts.confirmed} accent={T.green} icon={<CheckCircle size={14} color={T.green}/>}/>
         <StatCard label="Pending"   value={counts.pending}   accent={T.amber} icon={<ClockIcon   size={14} color={T.amber}/>}/>
@@ -504,7 +504,7 @@ export default function TodayPage({ onAlert }) {
             </span>
             <div style={{ marginLeft:"auto", width:7, height:7, borderRadius:"50%", background:T.green, boxShadow:`0 0 6px ${T.green}` }}/>
           </div>
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))", gap:10 }}>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(min(100%,220px),1fr))", gap:10 }}>
             {liveBay.active.map(b => (
               <LiveCard key={b.id} b={b}
                 onFinish={handleFinish}

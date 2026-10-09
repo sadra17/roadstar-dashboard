@@ -112,17 +112,20 @@ export function toggleTheme() {
 // Convenience — always export current tokens
 export const T = DARK; // components call getT() at render time for live switching
 
-export const STATUS = {
-  pending:   { color: DARK.amber,  text: DARK.amberText,  bg: DARK.amberBg,  border: DARK.amberBorder,  label: "Pending"   },
-  confirmed: { color: DARK.green,  text: DARK.greenText,  bg: DARK.greenBg,  border: DARK.greenBorder,  label: "Confirmed" },
-  waitlist:  { color: DARK.purple, text: DARK.purpleText, bg: DARK.purpleBg, border: DARK.purpleBorder, label: "Waitlist"  },
-  completed: { color: DARK.teal,   text: DARK.tealText,   bg: DARK.tealBg,   border: DARK.tealBorder,   label: "Completed" },
-  cancelled: { color: DARK.red,    text: DARK.redText,    bg: DARK.redBg,    border: DARK.redBorder,    label: "Cancelled" },
-  no_show:   { color: DARK.orange, text: DARK.orangeText, bg: DARK.orangeBg, border: DARK.orangeBorder, label: "No-show"   },
+// Status colours come from the CURRENT theme (light or dark) each time they're used.
+const STATUS_KEYS = {
+  pending:   ["amber",  "Pending"],
+  confirmed: ["green",  "Confirmed"],
+  waitlist:  ["purple", "Waitlist"],
+  completed: ["teal",   "Completed"],
+  cancelled: ["red",    "Cancelled"],
+  no_show:   ["orange", "No-show"],
 };
+const statusFor = (T, key) => { const [c, label] = STATUS_KEYS[key]; return { color: T[c], text: T[c + "Text"], bg: T[c + "Bg"], border: T[c + "Border"], label }; };
+export const STATUS = Object.fromEntries(Object.keys(STATUS_KEYS).map(k => [k, statusFor(DARK, k)]));
 
 export function sm(status) {
-  return STATUS[status] || STATUS.pending;
+  return statusFor(getT(), STATUS_KEYS[status] ? status : "pending");
 }
 
 export const SVC_DEFS = {

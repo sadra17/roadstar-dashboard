@@ -57,7 +57,9 @@ export default function App() {
       <>
         {/* UX1: session-expired banner above login form */}
         {expired && (
-          <div style={{ position:"fixed", top:0, left:0, right:0, zIndex:9999,
+          /* In the page flow (sticky, not fixed) so it pushes the login card down
+             instead of covering its top on short / narrow screens. */
+          <div style={{ position:"sticky", top:0, zIndex:9999, overflowWrap:"anywhere", lineHeight:1.5,
             background:"#1a0606", borderBottom:"1px solid #450a0a",
             padding:"12px 20px", textAlign:"center",
             fontSize:13, color:"#FCA5A5", fontFamily:"'Inter',-apple-system,sans-serif" }}>

@@ -151,7 +151,7 @@ function StepCode({ email, onSuccess, onBack }) {
     <form onSubmit={handleVerify}>
       <div style={{ textAlign:"center", marginBottom:24 }}>
         <div style={{ fontSize:13, color:T.textSub }}>A 6-digit code was sent to</div>
-        <div style={{ fontSize:14, fontWeight:700, color:T.text, marginTop:4 }}>{email}</div>
+        <div style={{ fontSize:14, fontWeight:700, color:T.text, marginTop:4, overflowWrap:"anywhere" }}>{email}</div>
       </div>
       {error && <Alert msg={error} />}
       {resent && <Alert msg="New code sent! Check your email." type="success" />}
@@ -266,7 +266,7 @@ export default function LoginPage({ onLogin }) {
   const handleBack    = ()   => setStep("otp-email");
 
   return (
-    <div style={{ minHeight:"100vh", display:"flex", alignItems:"center",
+    <div style={{ minHeight:"100vh", boxSizing:"border-box", display:"flex", alignItems:"center",
       justifyContent:"center", background:T.pageBg, fontFamily:T.font, padding:16 }}>
       <div style={{ width:"100%", maxWidth:step==="otp-code" ? 400 : 380,
         background:T.card, border:`1px solid ${T.borderVis}`,

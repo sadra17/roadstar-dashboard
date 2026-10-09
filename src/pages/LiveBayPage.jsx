@@ -76,8 +76,8 @@ export default function LiveBayPage({ onAlert }) {
       {b.tireSize && <div style={{ fontSize:16, fontWeight:700, color:T.orange, marginBottom:7, display:"flex", alignItems:"center", gap:6, letterSpacing:"0.02em" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/><path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4"/></svg>{b.tireSize}{b.tireQuantity ? ` · ${b.tireQuantity} tires` : ""}</div>}
       {!b.tireSize && b.doesntKnowTireSize && <div style={{ fontSize:13, fontWeight:600, color:T.textMuted, marginBottom:7 }}>Tire size: doesn't know{b.tireQuantity ? ` · ${b.tireQuantity} tires` : ""}</div>}
       {!b.tireSize && !b.doesntKnowTireSize && b.tireQuantity ? <div style={{ fontSize:13, fontWeight:600, color:T.textMuted, marginBottom:7 }}>{b.tireQuantity} tires</div> : null}
-      {b.notes && <div style={{ fontSize:11, color:T.textSecond, marginBottom:8, background:T.elevated, padding:"6px 9px", borderRadius:T.r8, display:"flex", alignItems:"flex-start", gap:5 }}><NoteIcon size={11} color={T.textMuted}/><span><b style={{color:T.textMuted}}>Customer note:</b> {b.notes}</span></div>}
-      {b.mechanicNotes && <div style={{ fontSize:11, color:T.textSecond, marginBottom:8, background:T.elevated, padding:"6px 9px", borderRadius:T.r8, display:"flex", alignItems:"flex-start", gap:5 }}><WrenchIcon size={11} color={T.textMuted}/><span><b style={{color:T.textMuted}}>Mechanic note:</b> {b.mechanicNotes}</span></div>}
+      {b.notes && <div style={{ fontSize:11, color:T.textSecond, marginBottom:8, background:T.elevated, padding:"7px 10px", borderRadius:T.r8, border:`1px solid ${T.border}`, display:"flex", alignItems:"flex-start", gap:6 }}><span style={{ display:"flex", marginTop:3 }}><NoteIcon size={11} color={T.textMuted}/></span><span style={{ minWidth:0, lineHeight:1.5, overflowWrap:"anywhere" }}><b style={{color:T.textMuted}}>Customer note:</b> {b.notes}</span></div>}
+      {b.mechanicNotes && <div style={{ fontSize:11, color:T.textSecond, marginBottom:8, background:T.elevated, padding:"7px 10px", borderRadius:T.r8, border:`1px solid ${T.border}`, display:"flex", alignItems:"flex-start", gap:6 }}><span style={{ display:"flex", marginTop:3 }}><WrenchIcon size={11} color={T.textMuted}/></span><span style={{ minWidth:0, lineHeight:1.5, overflowWrap:"anywhere" }}><b style={{color:T.textMuted}}>Mechanic note:</b> {b.mechanicNotes}</span></div>}
     </>
   );
 
@@ -97,14 +97,14 @@ export default function LiveBayPage({ onAlert }) {
               <div style={{ fontSize:12, fontWeight:600, color:T.textMuted, letterSpacing:"0.07em", textTransform:"uppercase", marginBottom:10 }}>
                 Ready to start — {data.ready.length} waiting
               </div>
-              <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))", gap:14 }}>
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(min(100%,260px),1fr))", gap:14 }}>
                 {data.ready.map(b => (
                   <div key={b.id} style={{ background:T.cardBg, border:`1.5px dashed ${T.border}`, borderRadius:T.r12, padding:"16px" }}>
-                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+                    <div style={{ display:"flex", flexWrap:"wrap", justifyContent:"space-between", alignItems:"center", gap:8, marginBottom:8 }}>
                       <span style={{ fontSize:11, fontWeight:700, letterSpacing:"0.06em", textTransform:"uppercase", color:T.textMuted }}>Scheduled {b.time}</span>
                       <Badge status={b.status}/>
                     </div>
-                    <div style={{ fontSize:16, fontWeight:700, color:T.textPrimary, marginBottom:2 }}>{b.firstName} {b.lastName}</div>
+                    <div style={{ fontSize:16, fontWeight:700, color:T.textPrimary, marginBottom:2, overflowWrap:"anywhere" }}>{b.firstName} {b.lastName}</div>
                     <div style={{ fontSize:12, fontWeight:600, color:T.blue, marginBottom:6, textTransform:"uppercase", letterSpacing:"0.04em" }}>{displaySvc(b)}</div>
                     {CustomerInfo(b)}
                     <Btn variant="primary" small style={{ width:"100%", justifyContent:"center", marginTop:4 }} icon={<PlusIcon size={13} color="#fff"/>} disabled={busy[b.id]} onClick={() => handleStart(b)}>
@@ -125,7 +125,7 @@ export default function LiveBayPage({ onAlert }) {
               <div style={{ fontSize:12, color:T.textMuted, marginBottom:12 }}>
                 {data.active.length} car{data.active.length !== 1 ? "s" : ""} currently in service
               </div>
-              <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))", gap:14, marginBottom:24 }}>
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(min(100%,260px),1fr))", gap:14, marginBottom:24 }}>
                 {data.active.map(b => {
                   const color    = getBayColor(b);
                   const isOver   = b.minutesRemaining <= 0;
@@ -135,8 +135,8 @@ export default function LiveBayPage({ onAlert }) {
                   return (
                     <div key={b.id} style={{ background:T.cardBg, border:`2px solid ${isOver ? T.red : `${color}50`}`, borderRadius:T.r12, padding:"16px", boxShadow:isOver?`0 0 16px ${T.red}30`:"none" }}>
                       {/* Bay header */}
-                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
-                        <span style={{ fontSize:11, fontWeight:700, letterSpacing:"0.07em", textTransform:"uppercase", color, background:`${color}18`, padding:"3px 9px", borderRadius:20 }}>{bayLabel}</span>
+                      <div style={{ display:"flex", flexWrap:"wrap", justifyContent:"space-between", alignItems:"center", gap:8, marginBottom:12 }}>
+                        <span style={{ fontSize:11, fontWeight:700, letterSpacing:"0.07em", textTransform:"uppercase", color, background:`${color}18`, padding:"3px 9px", borderRadius:20, whiteSpace:"nowrap" }}>{bayLabel}</span>
                         <span style={{ fontSize:12, fontWeight:700, color:isOver?T.red:isSoon?T.amber:T.green }}>
                           {isOver ? "Overdue" : `${b.minutesRemaining} min left`}
                         </span>
@@ -148,14 +148,14 @@ export default function LiveBayPage({ onAlert }) {
                       </div>
 
                       {/* Customer info */}
-                      <div style={{ fontSize:16, fontWeight:700, color:T.textPrimary, marginBottom:2 }}>{b.firstName} {b.lastName}</div>
-                      <div style={{ fontSize:12, fontWeight:600, color, marginBottom:4, textTransform:"uppercase", letterSpacing:"0.04em" }}>{displaySvc(b)}</div>
+                      <div style={{ fontSize:16, fontWeight:700, color:T.textPrimary, marginBottom:2, overflowWrap:"anywhere" }}>{b.firstName} {b.lastName}</div>
+                      <div style={{ fontSize:12, fontWeight:600, color, marginBottom:4, textTransform:"uppercase", letterSpacing:"0.04em", overflowWrap:"anywhere" }}>{displaySvc(b)}</div>
                       <div style={{ fontSize:11, color:T.textMuted, marginBottom:8 }}>In shop {b._elapsedMinutes ?? 0} min · {effectiveOcc(b)} min expected{b._extendedBy > 0 ? ` (+${b._extendedBy})` : ""}</div>
                       {CustomerInfo(b)}
 
                       {/* Alert */}
                       {(isOver || isSoon) && (
-                        <div style={{ background:T.redBg, border:`1px solid ${T.redBorder}`, borderRadius:T.r8, padding:"8px 10px", marginBottom:10, fontSize:12, fontWeight:600, color:T.redText }}>
+                        <div style={{ background:T.redBg, border:`1px solid ${T.redBorder}`, borderRadius:T.r8, padding:"8px 10px", marginBottom:10, fontSize:12, fontWeight:600, color:T.redText, overflowWrap:"anywhere" }}>
                           Is this done? — {b.firstName}
                         </div>
                       )}
@@ -183,12 +183,15 @@ export default function LiveBayPage({ onAlert }) {
               <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
                 {data.upcoming.map(b => (
                   <div key={b.id} style={{ background:T.cardBg, border:`1px solid ${T.border}`, borderRadius:T.r10, padding:"10px 14px", display:"flex", alignItems:"center", gap:12 }}>
-                    <div style={{ fontSize:13, fontWeight:700, color:T.textPrimary, minWidth:70 }}>{b.time}</div>
-                    <div style={{ flex:1 }}>
-                      <div style={{ fontSize:13, fontWeight:600, color:T.textPrimary }}>{b.firstName} {b.lastName}</div>
-                      <div style={{ fontSize:11, color:T.textMuted }}>{displaySvc(b)} · {effectiveOcc(b)} min</div>
+                    <div style={{ fontSize:13, fontWeight:700, color:T.textPrimary, minWidth:64, flexShrink:0, whiteSpace:"nowrap" }}>{b.time}</div>
+                    {/* Info + badge wrap together so the badge drops under the name on phones instead of overflowing the row */}
+                    <div style={{ flex:1, minWidth:0, display:"flex", flexWrap:"wrap", alignItems:"center", gap:"6px 12px" }}>
+                      <div style={{ flex:"1 1 160px", minWidth:0, overflowWrap:"anywhere" }}>
+                        <div style={{ fontSize:13, fontWeight:600, color:T.textPrimary }}>{b.firstName} {b.lastName}</div>
+                        <div style={{ fontSize:11, color:T.textMuted }}>{displaySvc(b)} · {effectiveOcc(b)} min</div>
+                      </div>
+                      <span style={{ flexShrink:0, display:"flex" }}><Badge status={b.status}/></span>
                     </div>
-                    <Badge status={b.status}/>
                   </div>
                 ))}
               </div>
@@ -219,13 +222,13 @@ function MechanicNoteModal({ booking, onClose, onSave }) {
     <Modal onClose={onClose}>
       <ModalTitle sub={`${booking.firstName} ${booking.lastName} — ${booking.service}`}>Mechanic Note</ModalTitle>
       {booking.notes && (
-        <div style={{ fontSize:12, color:T.textSecond, marginBottom:12, background:T.elevated, padding:"8px 11px", borderRadius:T.r8 }}>
+        <div style={{ fontSize:12, color:T.textSecond, marginBottom:12, background:T.elevated, padding:"8px 11px", borderRadius:T.r8, border:`1px solid ${T.border}`, overflowWrap:"anywhere" }}>
           <b style={{ color:T.textMuted }}>Customer note:</b> {booking.notes}
         </div>
       )}
       <textarea value={note} onChange={e => setNote(e.target.value)} rows={4} placeholder="Add a mechanic note…"
         style={{ width:"100%", background:T.pageBg, border:`1.5px solid ${T.border}`, borderRadius:T.r8, padding:"10px 12px", color:T.textPrimary, fontSize:13, fontFamily:T.font, outline:"none", boxSizing:"border-box", resize:"vertical" }}/>
-      <div style={{ display:"flex", gap:8, marginTop:12 }}>
+      <div style={{ display:"flex", flexWrap:"wrap", gap:8, marginTop:12 }}>
         <Btn onClick={async()=>{setBusy(true);try{await onSave(booking.id,note);}finally{setBusy(false);}}} disabled={busy} icon={<CheckIcon size={13} color="#fff"/>}>{busy?"Saving…":"Save Note"}</Btn>
         <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
       </div>

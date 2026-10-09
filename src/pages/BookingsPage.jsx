@@ -54,14 +54,14 @@ function BookingRow({ b, onUpdate, onDelete, onSMS, onEdit, onPayment, onAlert, 
   // Confirming texts the customer "CONFIRMED" — never offer it for an appointment that's already past
   const isPast = (b.date || "") < todayStr();
   return (
-    <div style={{ background:T.cardBg, borderLeft:`3px solid ${s.color}`, border:`1px solid ${T.border}`, borderRadius:T.r10, padding:"12px 16px", display:"flex", flexWrap:"wrap", alignItems:"center", gap:10, opacity:busy?0.6:1 }}>
-      <div style={{ flexShrink:0, textAlign:"center", minWidth:58, padding:"6px 8px", background:T.elevated, borderRadius:T.r8, border:`1px solid ${T.border}` }}>
+    <div style={{ background:T.cardBg, border:`1px solid ${T.border}`, borderLeft:`3px solid ${s.color}`, borderRadius:T.r10, padding:"12px 16px", display:"flex", flexWrap:"wrap", alignItems:"center", gap:10, opacity:busy?0.6:1 }}>
+      <div style={{ flexShrink:0, textAlign:"center", width:80, boxSizing:"border-box", padding:"6px 8px", background:T.elevated, borderRadius:T.r8, border:`1px solid ${T.border}` }}>
         <div style={{ fontSize:13, fontWeight:700, color:T.textPrimary, lineHeight:1 }}>{b.time}</div>
         <div style={{ fontSize:10, color:T.textMuted, marginTop:1 }}>{b.date}</div>
       </div>
-      <div style={{ flex:1, minWidth:140 }}>
+      <div style={{ flex:"1 1 min(240px, calc(100% - 90px))", minWidth:150, overflowWrap:"anywhere" }}>
         <div style={{ fontSize:13, fontWeight:700, color:T.textPrimary }}>{b.firstName} {b.lastName}</div>
-        <div style={{ fontSize:11, color:T.textMuted }}>{b.phone}{b.email && <span style={{ marginLeft:8 }}>{b.email}</span>}</div>
+        <div style={{ fontSize:11, color:T.textMuted, display:"flex", flexWrap:"wrap", columnGap:8 }}><span style={{ whiteSpace:"nowrap" }}>{b.phone}</span>{b.email && <span style={{ minWidth:0 }}>{b.email}</span>}</div>
         <div style={{ fontSize:11, fontWeight:600, color:s.color, textTransform:"uppercase", letterSpacing:"0.04em", marginTop:2 }}>{displaySvc(b)}</div>
         {b.tireSize && <div style={{ fontSize:10, color:T.orange, marginTop:1 }}>{b.tireSize}</div>}
         {b.mechanicNotes && <div style={{ fontSize:11, color:T.textMuted, marginTop:3, display:"flex", alignItems:"flex-start", gap:4 }}><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0,marginTop:1}}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>{b.mechanicNotes}</div>}
@@ -209,8 +209,8 @@ export default function BookingsPage({ onAlert }) {
         <div style={{ display:"flex", flexDirection:"column", gap:7 }}>
           {tab === "deleted"
             ? deleted.map(b => (
-                <div key={b.id} style={{ background:T.cardBg, border:`1px solid ${T.border}`, borderRadius:T.r10, padding:"12px 16px", display:"flex", alignItems:"center", gap:12, opacity:0.8 }}>
-                  <div style={{ flex:1 }}>
+                <div key={b.id} style={{ background:T.cardBg, border:`1px solid ${T.border}`, borderRadius:T.r10, padding:"12px 16px", display:"flex", flexWrap:"wrap", alignItems:"center", gap:12, opacity:0.8 }}>
+                  <div style={{ flex:"1 1 180px", minWidth:0, overflowWrap:"anywhere" }}>
                     <div style={{ fontSize:13, fontWeight:600, color:T.textSecond }}>{b.firstName} {b.lastName} — {b.date} {b.time}</div>
                     <div style={{ fontSize:11, color:T.textMuted }}>{displaySvc(b)}</div>
                   </div>
@@ -312,8 +312,8 @@ export default function BookingsPage({ onAlert }) {
             <div style={{fontSize:16,fontWeight:700,color:T.textPrimary,marginBottom:8}}>
               {confirmAct.type==="cancel" ? "Cancel this booking?" : "Confirm this booking?"}
             </div>
-            <div style={{fontSize:13,color:T.textMuted,marginBottom:20}}>{confirmAct.name}</div>
-            <div style={{display:"flex",gap:10,justifyContent:"center"}}>
+            <div style={{fontSize:13,color:T.textMuted,marginBottom:20,overflowWrap:"anywhere"}}>{confirmAct.name}</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:10,justifyContent:"center"}}>
               <Btn
                 variant={confirmAct.type==="cancel"?"danger":"success"}
                 onClick={async()=>{
@@ -340,7 +340,7 @@ export default function BookingsPage({ onAlert }) {
             <div style={{fontSize:13,color:T.textMuted,marginBottom:20,lineHeight:1.5}}>
               This booking will be moved to Recently Deleted<br/>and can be restored within 30 days.
             </div>
-            <div style={{display:"flex",gap:10,justifyContent:"center"}}>
+            <div style={{display:"flex",flexWrap:"wrap",gap:10,justifyContent:"center"}}>
               <Btn variant="danger" onClick={async()=>{try{await handleDelete(deleteId);}catch(e){onAlert?.(errText(e),"error");}setDeleteId(null);}} icon={<TrashIcon size={13} color={T.red}/>}>Yes, delete</Btn>
               <Btn variant="ghost" onClick={()=>setDeleteId(null)}>Keep it</Btn>
             </div>
@@ -374,17 +374,17 @@ function EditModal({ booking: b, onClose, onSave }) {
     <Modal onClose={onClose} persistent>
       <ModalTitle sub={displaySvc(b)}>Edit Booking</ModalTitle>
       <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
-          <div><Lbl>First name</Lbl><Inp value={form.firstName} onChange={e=>set("firstName",e.target.value)} placeholder="John"/></div>
-          <div><Lbl>Last name</Lbl><Inp value={form.lastName} onChange={e=>set("lastName",e.target.value)} placeholder="Smith"/></div>
-          <div><Lbl>Phone</Lbl><Inp type="tel" value={form.phone} onChange={e=>set("phone",e.target.value)} placeholder="+1 (416) 555-0000"/></div>
-          <div><Lbl>Email</Lbl><Inp type="email" value={form.email} onChange={e=>set("email",e.target.value)} placeholder="optional"/></div>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(150px, 1fr))", gap:10 }}>
+          <div style={{ minWidth:0 }}><Lbl>First name</Lbl><Inp value={form.firstName} onChange={e=>set("firstName",e.target.value)} placeholder="John"/></div>
+          <div style={{ minWidth:0 }}><Lbl>Last name</Lbl><Inp value={form.lastName} onChange={e=>set("lastName",e.target.value)} placeholder="Smith"/></div>
+          <div style={{ minWidth:0 }}><Lbl>Phone</Lbl><Inp type="tel" value={form.phone} onChange={e=>set("phone",e.target.value)} placeholder="+1 (416) 555-0000"/></div>
+          <div style={{ minWidth:0 }}><Lbl>Email</Lbl><Inp type="email" value={form.email} onChange={e=>set("email",e.target.value)} placeholder="optional"/></div>
         </div>
-        <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr", gap:10 }}>
+        <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr", gap:10, alignItems:"end" }}>
           <div><Lbl>Tire size</Lbl><Inp value={form.tireSize} onChange={e=>set("tireSize",formatTireSize(e.target.value, e.target.selectionStart === e.target.value.length))} placeholder="225/65R17" style={{ fontSize:16, fontWeight:600, letterSpacing:"0.02em" }}/></div>
           <div><Lbl>How many tires</Lbl><Inp type="number" value={form.tireQuantity} onChange={e=>set("tireQuantity",e.target.value)} placeholder="e.g. 4"/></div>
         </div>
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, alignItems:"end" }}>
           <div><Lbl>Price ($)</Lbl><Inp type="number" value={form.price} onChange={e=>set("price",e.target.value)} placeholder="0.00"/></div>
           <div><Lbl>Payment method</Lbl>
             <Sel value={form.paymentMethod} onChange={e=>set("paymentMethod",e.target.value)}
@@ -392,7 +392,7 @@ function EditModal({ booking: b, onClose, onSave }) {
           </div>
         </div>
         {/* Status / Date / Time: 3 across on wide modals, stacks on phones so nothing is squeezed */}
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(120px, 1fr))", gap:10 }}>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(120px, 1fr))", gap:10, alignItems:"end" }}>
           <div style={{ minWidth:0 }}><Lbl>Status</Lbl>
             <Sel value={form.status} onChange={e=>set("status",e.target.value)} options={["pending","confirmed","waitlist","completed","cancelled","no_show"].map(s=>({value:s,label:s}))}/>
           </div>
@@ -404,7 +404,7 @@ function EditModal({ booking: b, onClose, onSave }) {
             style={{ width:"100%", background:T.pageBg, border:`1.5px solid ${T.border}`, borderRadius:T.r8, padding:"9px 12px", color:T.textPrimary, fontSize:13, fontFamily:T.font, outline:"none", boxSizing:"border-box", resize:"vertical" }}/>
         </div>
       </div>
-      <div style={{ display:"flex", gap:8, marginTop:16 }}>
+      <div style={{ display:"flex", flexWrap:"wrap", gap:8, marginTop:16 }}>
         <Btn onClick={async()=>{setBusy(true);try{await onSave(b.id,form);}finally{setBusy(false);}}} disabled={busy} icon={<CheckIcon size={13} color="#fff"/>}>{busy?"Saving…":"Save"}</Btn>
         <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
       </div>
@@ -481,7 +481,7 @@ function PaymentModal({ booking: b, onClose, onSave, onAlert }) {
           <Inp value={form.paymentNotes} onChange={e=>set("paymentNotes",e.target.value)} placeholder="Optional payment note"/>
         </div>
       </div>
-      <div style={{ display:"flex", gap:8, marginTop:16, paddingTop:14, borderTop:`1px solid ${T.border}` }}>
+      <div style={{ display:"flex", flexWrap:"wrap", gap:8, marginTop:16, paddingTop:14, borderTop:`1px solid ${T.border}` }}>
         <Btn onClick={async()=>{
           const priceNum = form.finalPrice !== "" && form.finalPrice != null ? parseFloat(form.finalPrice) : null;
           if (priceNum != null && (isNaN(priceNum) || priceNum < 0)) { onAlert?.("Price must be 0 or more.", "error"); return; }

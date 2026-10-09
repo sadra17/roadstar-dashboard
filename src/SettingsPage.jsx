@@ -191,15 +191,15 @@ function HoursSection({s, set}) {
                 <span style={{fontSize:13,color:closed?T.textMuted:T.textPrimary}}>{closed?"Closed":"Open"}</span>
               </label>
               {!closed && (
-                <>
+                <div style={{display:"flex",alignItems:"center",gap:8,flex:"1 1 220px",minWidth:0,maxWidth:300}}>
                   <input type="time" value={dh.open || "09:00"} onChange={e => set(`hours.${i}.open`, e.target.value)}
-                    style={{background:T.pageBg,border:`1.5px solid ${T.border}`,borderRadius:T.r8,
+                    style={{flex:"1 1 0",minWidth:0,boxSizing:"border-box",background:T.pageBg,border:`1.5px solid ${T.border}`,borderRadius:T.r8,
                       padding:"7px 10px",color:T.textPrimary,fontSize:12,fontFamily:T.font,outline:"none",colorScheme:pickerScheme()}}/>
-                  <span style={{color:T.textMuted,fontSize:12}}>to</span>
+                  <span style={{color:T.textMuted,fontSize:12,flexShrink:0}}>to</span>
                   <input type="time" value={dh.close || "18:00"} onChange={e => set(`hours.${i}.close`, e.target.value)}
-                    style={{background:T.pageBg,border:`1.5px solid ${T.border}`,borderRadius:T.r8,
+                    style={{flex:"1 1 0",minWidth:0,boxSizing:"border-box",background:T.pageBg,border:`1.5px solid ${T.border}`,borderRadius:T.r8,
                       padding:"7px 10px",color:T.textPrimary,fontSize:12,fontFamily:T.font,outline:"none",colorScheme:pickerScheme()}}/>
-                </>
+                </div>
               )}
             </div>
           );
@@ -221,10 +221,10 @@ function BlackoutSection({s, set}) {
         {dates.map((d, i) => (
           <div key={i} style={{display:"flex",gap:8,alignItems:"center"}}>
             <input type="date" value={d || ""} onChange={e => {const dd=[...dates];dd[i]=e.target.value;set("blackoutDates",dd);}}
-              style={{background:T.pageBg,border:`1.5px solid ${T.border}`,borderRadius:T.r8,
+              style={{flex:"0 1 200px",minWidth:0,boxSizing:"border-box",background:T.pageBg,border:`1.5px solid ${T.border}`,borderRadius:T.r8,
                 padding:"9px 12px",color:T.textPrimary,fontSize:13,fontFamily:T.font,outline:"none",colorScheme:pickerScheme()}}/>
             <button onClick={() => set("blackoutDates", dates.filter((_,j) => j!==i))}
-              style={{background:T.redBg,border:`1px solid ${T.redBorder}`,borderRadius:T.r8,
+              style={{flexShrink:0,background:T.redBg,border:`1px solid ${T.redBorder}`,borderRadius:T.r8,
                 padding:"9px 14px",color:T.redText,fontSize:12,fontFamily:T.font,cursor:"pointer"}}>Remove</button>
           </div>
         ))}
@@ -270,8 +270,8 @@ function ServicesSection({s, set}) {
                   <span style={{fontSize:12,color:active?T.greenText:T.textMuted}}>{active?"Active":"Inactive"}</span>
                 </label>
                 <button onClick={() => set("services", svcs.filter((_,j) => j!==i))}
-                  style={{background:T.redBg,border:`1px solid ${T.redBorder}`,borderRadius:T.r8,
-                    padding:"6px 10px",color:T.redText,fontSize:11,fontFamily:T.font,cursor:"pointer"}}>Remove</button>
+                  style={{background:T.redBg,border:`1px solid ${T.redBorder}`,borderRadius:T.r8,minHeight:36,
+                    padding:"7px 13px",color:T.redText,fontSize:12,fontFamily:T.font,cursor:"pointer"}}>Remove</button>
               </div>
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(100px,1fr))",gap:8}}>
                 <div>
@@ -428,7 +428,7 @@ function ReviewSection({s, set}) {
 // ── REMINDERS SECTION ─────────────────────────────────────────────────────────
 function Toggle({checked, onChange, T}) {
   return (
-    <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}}>
+    <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",flexShrink:0}}>
       <input type="checkbox" checked={checked} onChange={onChange}
         style={{width:16,height:16,cursor:"pointer",accentColor:T.blue}}/>
       <span style={{fontSize:13,color:checked?T.textPrimary:T.textMuted}}>{checked?"On":"Off"}</span>
@@ -443,7 +443,7 @@ function RemindersSection({s, set}) {
 
   const rowStyle = {
     background: T.elevated, border:`1px solid ${T.border}`, borderRadius:T.r10,
-    padding:"16px 18px", display:"flex", flexDirection:"column", gap:12,
+    padding:"16px 18px", display:"flex", flexDirection:"column", gap:12, marginBottom:12,
   };
   const badge = (label, color) => (
     <span style={{fontSize:10,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",
@@ -458,8 +458,8 @@ function RemindersSection({s, set}) {
       {/* ── Reminder 1: Advance notice (12h / 24h) ─────────────────────── */}
       <div style={rowStyle}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12}}>
-          <div>
-            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:2}}>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4,flexWrap:"wrap"}}>
               <span style={{fontSize:13,fontWeight:700,color:T.textPrimary}}>Advance reminder</span>
               {badge("Optional", T.blue)}
             </div>
@@ -470,12 +470,13 @@ function RemindersSection({s, set}) {
           <Toggle checked={advOn} onChange={() => set("reminderAdvanceEnabled", !advOn)} T={T}/>
         </div>
         {advOn && (
-          <div style={{display:"flex",alignItems:"center",gap:10,paddingTop:4,borderTop:`1px solid ${T.border}`}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,paddingTop:12,borderTop:`1px solid ${T.border}`,flexWrap:"wrap"}}>
             <span style={{fontSize:12,color:T.textMuted,flexShrink:0}}>Send</span>
+            <div style={{display:"flex",gap:10,flex:"1 1 180px",minWidth:0,maxWidth:360}}>
             {[12, 24].map(h => (
               <button key={h} type="button"
                 onClick={() => set("reminderAdvanceHours", h)}
-                style={{padding:"7px 18px",borderRadius:T.r8,fontSize:13,fontWeight:600,cursor:"pointer",
+                style={{flex:"1 1 0",minWidth:0,padding:"7px 12px",minHeight:36,lineHeight:1.3,borderRadius:T.r8,fontSize:13,fontWeight:600,cursor:"pointer",
                   border:`1.5px solid ${(s.reminderAdvanceHours||24)===h ? T.blue : T.border}`,
                   background:(s.reminderAdvanceHours||24)===h ? T.blueSubtle : T.pageBg,
                   color:(s.reminderAdvanceHours||24)===h ? T.blueBright : T.textMuted,
@@ -483,6 +484,7 @@ function RemindersSection({s, set}) {
                 {h} hours before
               </button>
             ))}
+            </div>
           </div>
         )}
       </div>
@@ -490,8 +492,8 @@ function RemindersSection({s, set}) {
       {/* ── Reminder 2: Same-day (N minutes before) ────────────────────── */}
       <div style={rowStyle}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12}}>
-          <div>
-            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:2}}>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4,flexWrap:"wrap"}}>
               <span style={{fontSize:13,fontWeight:700,color:T.textPrimary}}>Same-day reminder</span>
               {badge("Recommended", T.green)}
             </div>
@@ -502,7 +504,7 @@ function RemindersSection({s, set}) {
           <Toggle checked={on} onChange={() => set("reminderEnabled", !on)} T={T}/>
         </div>
         {on && (
-          <div style={{display:"flex",alignItems:"center",gap:10,paddingTop:4,borderTop:`1px solid ${T.border}`}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,paddingTop:12,borderTop:`1px solid ${T.border}`,flexWrap:"wrap"}}>
             <span style={{fontSize:12,color:T.textMuted,flexShrink:0}}>Send</span>
             <NumInput min={5} max={240} value={s.reminderMinutes || 30}
               onChange={n => set("reminderMinutes", n)}
@@ -672,14 +674,14 @@ export default function SettingsPage({onAlert, onDirtyChange}) {
 
   // Save bar JSX (rendered directly, not as a component)
   const saveJSX = (
-    <div style={{paddingTop:16,marginTop:20,borderTop:`1px solid ${T.border}`,display:"flex",alignItems:"center",gap:12}}>
+    <div style={{paddingTop:16,marginTop:20,borderTop:`1px solid ${T.border}`,display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
       <button onClick={save} disabled={sav}
-        style={{padding:"10px 24px",borderRadius:T.r8,background:saved?T.greenBg:T.blue,
+        style={{padding:"10px 24px",whiteSpace:"nowrap",flexShrink:0,borderRadius:T.r8,background:saved?T.greenBg:T.blue,
           border:`1px solid ${saved?T.greenBorder:T.blue}`,color:saved?T.greenText:"#fff",
           fontSize:13,fontWeight:600,fontFamily:T.font,cursor:sav?"not-allowed":"pointer",opacity:sav?0.6:1}}>
         {sav ? "Saving…" : saved ? "Saved" : "Save changes"}
       </button>
-      {err && <span style={{fontSize:12,color:T.redText}}>{err}</span>}
+      {err && <span style={{fontSize:12,color:T.redText,flex:"1 1 180px",minWidth:0,overflowWrap:"anywhere",lineHeight:1.5}}>{err}</span>}
       {!err && dirty && !sav && !saved && <span style={{fontSize:12,color:T.textMuted}}>Unsaved changes</span>}
     </div>
   );
@@ -700,9 +702,6 @@ export default function SettingsPage({onAlert, onDirtyChange}) {
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
           Settings
         </button>
-        <div style={{fontSize:15,fontWeight:700,color:T.textPrimary,marginBottom:16}}>
-          {SECTIONS.find(x => x.id === sec)?.label}
-        </div>
         <SectionErrorBoundary key={sec}><SectionComp s={s} set={set}/></SectionErrorBoundary>
         {saveJSX}
       </div>
@@ -712,7 +711,9 @@ export default function SettingsPage({onAlert, onDirtyChange}) {
   // Desktop layout — NO inner component definitions
   return (
     <div style={{display:"flex",gap:24,alignItems:"flex-start"}}>
-      <div style={{width:192,flexShrink:0,position:"sticky",top:24,alignSelf:"flex-start"}}>
+      {/* Not sticky: the page wrapper clips overflow, so a sticky offset only pushed
+          the nav 24px below the section title instead of pinning it. */}
+      <div style={{width:192,flexShrink:0,alignSelf:"flex-start"}}>
         {navJSX}
         {dirty && (
           <div style={{marginTop:8,padding:"8px 12px",background:T.amberBg,border:`1px solid ${T.amberBorder}`,

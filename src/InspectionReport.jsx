@@ -123,12 +123,12 @@ export default function InspectionModal({ booking, onClose, onSaved, onAlert }) 
       {err && <div style={{ background:T.redBg, border:`1px solid ${T.redBorder}`, borderRadius:T.r8, padding:"9px 12px", fontSize:12, color:T.redText, marginBottom:12 }}>{err}</div>}
 
       {/* Header fields */}
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:12, marginBottom:16 }}>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(140px, 1fr))", gap:12, marginBottom:16 }}>
         <div><Lbl>Vehicle</Lbl><Inp value={form.vehicle} onChange={e=>sf("vehicle",e.target.value)} placeholder="e.g. Ford Escape"/></div>
         <div><Lbl>Plate</Lbl><Inp value={form.plate} onChange={e=>sf("plate",e.target.value)} placeholder="Plate #"/></div>
         <div><Lbl>Mileage</Lbl><Inp value={form.mileage} onChange={e=>sf("mileage",e.target.value)} placeholder="km"/></div>
         <div><Lbl>RO #</Lbl><Inp value={form.roNumber} onChange={e=>sf("roNumber",e.target.value)} placeholder="Repair order #"/></div>
-        <div style={{ gridColumn:"span 2" }}><Lbl>Technician</Lbl><Inp value={form.technician} onChange={e=>sf("technician",e.target.value)} placeholder="Technician name"/></div>
+        <div style={{ gridColumn:"1 / -1" }}><Lbl>Technician</Lbl><Inp value={form.technician} onChange={e=>sf("technician",e.target.value)} placeholder="Technician name"/></div>
       </div>
 
       {/* Accordion sections */}
@@ -140,11 +140,11 @@ export default function InspectionModal({ booking, onClose, onSaved, onAlert }) 
             <div key={sec.title} style={{ borderBottom:`1px solid ${T.border}` }}>
               <button onClick={() => toggleSection(i)}
                 style={{ width:"100%", display:"flex", alignItems:"center", justifyContent:"space-between", gap:8, padding:"12px 2px", background:"transparent", border:"none", cursor:"pointer", color:T.textPrimary }}>
-                <span style={{ display:"flex", alignItems:"center", gap:8, fontSize:13, fontWeight:700 }}>
+                <span style={{ display:"flex", alignItems:"center", gap:8, fontSize:13, fontWeight:700, textAlign:"left", minWidth:0 }}>
                   <span style={{ color:T.textMuted, fontSize:11, width:12, display:"inline-block", transform:isOpen?"rotate(90deg)":"none", transition:"transform .12s" }}>▶</span>
                   {sec.title}
                 </span>
-                {flagged > 0 && <span style={{ fontSize:11, fontWeight:700, color:T.red, background:T.redBg, border:`1px solid ${T.redBorder}`, borderRadius:20, padding:"1px 9px" }}>{flagged} flagged</span>}
+                {flagged > 0 && <span style={{ fontSize:11, fontWeight:700, color:T.red, background:T.redBg, border:`1px solid ${T.redBorder}`, borderRadius:20, padding:"1px 9px", whiteSpace:"nowrap", flexShrink:0 }}>{flagged} flagged</span>}
               </button>
               {isOpen && (
                 <div style={{ paddingBottom:10 }}>
@@ -185,13 +185,13 @@ export default function InspectionModal({ booking, onClose, onSaved, onAlert }) 
       <div style={{ marginTop:16, paddingTop:14, borderTop:`1px solid ${T.border}` }}>
         <Lbl>Email report to customer (optional)</Lbl>
         <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
-          <div style={{ flex:"1 1 220px" }}><Inp type="email" value={emailTo} onChange={e=>setEmailTo(e.target.value)} placeholder="customer@email.com"/></div>
+          <div style={{ flex:"1 1 220px", minWidth:0 }}><Inp type="email" value={emailTo} onChange={e=>setEmailTo(e.target.value)} placeholder="customer@email.com"/></div>
           <Btn variant="ghost" onClick={handleEmail} disabled={busy || !emailTo.trim()}>Save &amp; Email</Btn>
         </div>
       </div>
 
       {/* Actions */}
-      <div style={{ display:"flex", gap:8, marginTop:18, paddingTop:14, borderTop:`1px solid ${T.border}` }}>
+      <div style={{ display:"flex", flexWrap:"wrap", gap:8, marginTop:18, paddingTop:14, borderTop:`1px solid ${T.border}` }}>
         <Btn onClick={handleSave} disabled={busy}>{busy?"Saving…":"Save Inspection"}</Btn>
         <Btn variant="ghost" onClick={onClose} disabled={busy}>Cancel</Btn>
       </div>

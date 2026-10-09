@@ -36,6 +36,10 @@
       /* No native pull-to-refresh / scroll chaining: a swipe inside a modal must
          never reload the page. The dashboard has its own modal-aware refresh. */
       html, body { overscroll-behavior-y: none; }
+          /* placeholders never inherit bold value styling */
+      input::placeholder, textarea::placeholder { font-weight: 400; letter-spacing: normal; }
+      /* on phones, toasts sit at the top so they never cover a modal's buttons */
+      @media (max-width: 600px) { .rs-toasts { top: 16px !important; bottom: auto !important; left: 16px !important; right: 16px !important; } }
     </style>
   </head>
   <body>

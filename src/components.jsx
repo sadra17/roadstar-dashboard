@@ -79,7 +79,7 @@ export function Inp({ value, onChange, placeholder, type = "text", disabled = fa
   return (
     <input type={type} value={value || ""} onChange={onChange} placeholder={placeholder} disabled={disabled}
       onFocus={() => setF(true)} onBlur={() => setF(false)}
-      style={{ width:"100%", background:T.pageBg, border:`1.5px solid ${f?T.blue:T.border}`, borderRadius:T.r8, padding:"9px 12px", color:T.textPrimary, fontSize:13, fontFamily:T.font, outline:"none", boxSizing:"border-box", opacity:disabled?0.5:1, transition:"border-color .13s", ...style }}/>
+      style={{ width:"100%", background:T.pageBg, border:`1.5px solid ${f?T.blue:T.border}`, borderRadius:T.r8, padding:"9px 12px", minHeight:38, color:T.textPrimary, fontSize:13, fontFamily:T.font, outline:"none", boxSizing:"border-box", opacity:disabled?0.5:1, transition:"border-color .13s", ...style }}/>
   );
 }
 
@@ -123,7 +123,7 @@ export function Modal({ children, onClose, wide = false, persistent = false }) {
       style={{ position:"fixed", inset:0, background:"rgba(2,4,12,.85)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center", padding:16, backdropFilter:"blur(4px)", overscrollBehavior:"contain" }}>
       {/* overscrollBehavior:contain keeps scrolling inside the modal — reaching the
           top/bottom never scroll-chains to the page or triggers pull-to-refresh */}
-      <div role="dialog" aria-modal="true" onInput={() => { touchedRef.current = true; }} onChange={() => { touchedRef.current = true; }} style={{ background:T.panelBg, border:`1px solid ${T.borderVis}`, borderRadius:T.r16, padding:24, maxWidth:wide?720:480, width:"100%", boxShadow:T.shadowLg, maxHeight:"90vh", overflowY:"auto", overscrollBehavior:"contain", WebkitOverflowScrolling:"touch", position:"relative" }}>
+      <div role="dialog" aria-modal="true" onInput={() => { touchedRef.current = true; }} onChange={() => { touchedRef.current = true; }} style={{ background:T.panelBg, border:`1px solid ${T.borderVis}`, borderRadius:T.r16, padding:"clamp(16px, 5vw, 24px)", maxWidth:wide?720:480, width:"100%", boxShadow:T.shadowLg, maxHeight:"90vh", overflowY:"auto", overscrollBehavior:"contain", WebkitOverflowScrolling:"touch", position:"relative" }}>
         <button onClick={onClose} aria-label="Close" title="Close (Esc)" style={{ position:"absolute", top:8, right:8, background:T.elevated, border:`1px solid ${T.border}`, borderRadius:T.r8, width:40, height:40, display:"flex", alignItems:"center", justifyContent:"center", color:T.textMuted, cursor:"pointer", zIndex:1 }}>
           <XIcon size={15}/>
         </button>
@@ -200,8 +200,8 @@ export function StatCard({ label, value, sub, accent, icon }) {
   return (
     <div style={{ background:T.cardBg, border:`1px solid ${T.border}`, borderRadius:T.r12, padding:"16px 18px", position:"relative", overflow:"hidden" }}>
       <div style={{ position:"absolute", top:0, left:0, bottom:0, width:3, background:accent||T.blue, borderRadius:"3px 0 0 3px" }}/>
-      <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", marginBottom:8 }}>
-        <div style={{ fontSize:10, fontWeight:600, letterSpacing:"0.07em", textTransform:"uppercase", color:T.textMuted }}>{label}</div>
+      <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:6, marginBottom:8 }}>
+        <div style={{ fontSize:10, fontWeight:600, letterSpacing:"0.07em", textTransform:"uppercase", color:T.textMuted, minWidth:0, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{label}</div>
         {icon && <span style={{ display:"flex", alignItems:"center", justifyContent:"center", opacity:0.6 }}>{icon}</span>}
       </div>
       <div style={{ fontSize:26, fontWeight:800, color:T.textPrimary, lineHeight:1, letterSpacing:"-0.03em", fontVariantNumeric:"tabular-nums" }}>{value}</div>
@@ -326,7 +326,7 @@ export function CompleteOrderModal({ booking: b, onClose, onConfirm }) {
         <div style={{ fontSize:11, color:T.textMuted, marginTop:10 }}>Enter a price and payment method to complete.</div>
       )}
       <div style={{ display:"flex", gap:8, marginTop:16, paddingTop:14, borderTop:`1px solid ${T.border}`, flexWrap:"wrap" }}>
-        <Btn disabled={!canSubmit} icon={<CheckIcon size={13} color="#fff"/>}
+        <Btn style={{ flex:"1 1 160px", justifyContent:"center" }} disabled={!canSubmit} icon={<CheckIcon size={13} color="#fff"/>}
           onClick={async()=>{ if (busy) return; setBusy(true); try { await onConfirm(b.id, {
             finalPrice:    parseFloat(form.finalPrice),
             paymentMethod: form.paymentMethod,
@@ -335,7 +335,7 @@ export function CompleteOrderModal({ booking: b, onClose, onConfirm }) {
           }); } finally { setBusy(false); } }}>
           {busy ? "Completing…" : "Confirm & Complete"}
         </Btn>
-        <Btn variant="ghost" onClick={onClose} disabled={busy}>Cancel</Btn>
+        <Btn style={{ flex:"1 1 120px", justifyContent:"center" }} variant="ghost" onClick={onClose} disabled={busy}>Cancel</Btn>
       </div>
     </Modal>
   );
