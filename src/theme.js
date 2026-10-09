@@ -146,31 +146,55 @@ export function displaySvc(b) {
   return b.service === "Other" && b.customService ? `Other — ${b.customService}` : b.service;
 }
 
+// Local calendar date (not UTC): after 8 PM Toronto time the UTC date is
+// already tomorrow.
+export function localYmd(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 export function todayStr() {
-  return new Date().toISOString().slice(0, 10);
+  return localYmd();
 }
 
 // Format a dollar amount with thousands separators, e.g. 66243 → "$66,243".
 // Pass decimals (0 or 2) to force that many; default trims to whole dollars
-// when there are no cents, otherwise shows 2 decimals.
+// when there are no cents, otherwise always shows 2 decimals ("$120.50").
 export function money(n, decimals) {
   const num = Number(n) || 0;
-  const opts = decimals != null
-    ? { minimumFractionDigits: decimals, maximumFractionDigits: decimals }
-    : { minimumFractionDigits: 0, maximumFractionDigits: 2 };
-  return "$" + num.toLocaleString("en-US", opts);
+  const d = decimals != null ? decimals : (Math.round(num * 100) % 100 === 0 ? 0 : 2);
+  return "$" + num.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
 }
+
+// "9:30 AM" / "1:00 PM" → minutes after midnight, for sorting times
+// chronologically (text sorting puts 9:30 AM after 1:00 PM). Also accepts
+// "13:00". Unparseable / missing times sort last.
+export function timeToMinutes(t) {
+  const m = /^\s*(\d{1,2}):(\d{2})\s*([AaPp][Mm])?\s*$/.exec(t || "");
+  if (!m) return Infinity;
+  let h = Number(m[1]);
+  const period = (m[3] || "").toUpperCase();
+  if (period === "PM" && h !== 12) h += 12;
+  if (period === "AM" && h === 12) h = 0;
+  return h * 60 + Number(m[2]);
+}
+export const byTime = (a, b) => timeToMinutes(a.time) - timeToMinutes(b.time);
 
 // Auto-format a tire size as the user types: inserts the "/" and "R" so that
 // e.g. "2256517" becomes "225/65R17". Letters are upper-cased. Anything that
 // isn't a plain ###/##R## sequence is left mostly as typed (just upper-cased)
 // so unusual sizes (P-metric, LT, 31x10.5R15, etc.) still work.
-export function formatTireSize(raw) {
+// caretAtEnd=false (editing in the middle) leaves the text as typed so digits don't shuffle.
+export function formatTireSize(raw, caretAtEnd = true) {
   if (!raw) return "";
-  let v = raw.toUpperCase();
-  const digits = v.replace(/[^0-9]/g, "");
-  // Only auto-insert separators when the input is purely digits (the common case).
-  if (/^[0-9]+$/.test(v.replace(/\s/g, "")) && digits.length >= 4) {
+  const v = raw.toUpperCase();
+  if (!caretAtEnd) return v;
+  // Auto-insert separators when the input is only digits plus the separators
+  // this function adds itself ("/" and the "R" after the ratio), so typing
+  // digit-by-digit keeps formatting after "225/6" has been inserted.
+  const plain = v.replace(/\s/g, "");
+  if (/^\d{3}\/?\d{0,4}R?\d{0,3}$|^\d+$/.test(plain)) {
+    const digits = plain.replace(/\D/g, "");
+    if (digits.length < 4) return digits.length === 3 && plain.endsWith("/") ? plain : digits;
+    if (digits.length > 7) return v; // two sizes / long entry: leave as typed
     const d = digits.slice(0, 7); // width(3) + ratio(2) + rim(2)
     let out = d.slice(0, 3);
     if (d.length > 3) out += "/" + d.slice(3, 5);

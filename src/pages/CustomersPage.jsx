@@ -1,5 +1,5 @@
 // pages/CustomersPage.jsx — no emoji, SVG icons
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { fetchCustomers, fetchCustomerByPhone, exportCustomersCSV } from "../api.js";
 import { getT, displaySvc, money } from "../theme.js";
 import { Badge, Btn, Modal, ModalTitle, PageHeader, Spinner } from "../components.jsx";
@@ -15,6 +15,31 @@ const CalIcon     = ({ size, color }) => <Ic size={size} color={color} ch={<><re
 const TireIcon    = ({ size, color }) => <Ic size={size} color={color} ch={<><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/><path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4"/></>}/>;
 const StarIcon    = ({ size, color }) => <Ic size={size} color={color} ch={<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>}/>;
 
+// Local calendar date (not UTC): after 8 PM Toronto time the UTC date is already tomorrow.
+const ymd = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const isYmd = s => typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
+const NOT_A_VISIT = ["cancelled", "no_show", "waitlist"];
+
+// Visits = bookings that actually happened: up to today and not cancelled, a no-show
+// or a waitlist entry. "Last" is the newest of those, never a future booking.
+// Uses the booking list when the API sends it; otherwise falls back to its numbers.
+function visitInfo(c) {
+  const today = ymd();
+  if (!Array.isArray(c.bookings)) {
+    return { visits: c.visitCount || 0, last: isYmd(c.lastVisit) && c.lastVisit <= today ? c.lastVisit : null, next: null };
+  }
+  let visits = 0, last = null, next = null;
+  for (const b of c.bookings) {
+    if (!isYmd(b?.date)) continue;
+    if (b.date <= today && !NOT_A_VISIT.includes(b.status)) {
+      visits++;
+      if (!last || b.date > last) last = b.date;
+    }
+    if (b.date >= today && ["pending", "confirmed"].includes(b.status) && (!next || b.date < next)) next = b.date;
+  }
+  return { visits, last, next };
+}
+
 function Stat({ label, value, color }) {
   const T = getT();
   return (
@@ -28,7 +53,8 @@ function Stat({ label, value, color }) {
 function CustomerRow({ c, onClick }) {
   const T = getT();
   const [h, setH] = useState(false);
-  const isLoyal = c.visitCount >= 3;
+  const { visits, last, next } = visitInfo(c);
+  const isLoyal = visits >= 3;
   return (
     <button
       onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
@@ -69,9 +95,10 @@ function CustomerRow({ c, onClick }) {
 
       {/* Stats */}
       <div style={{ textAlign:"right", flexShrink:0 }}>
-        <div style={{ fontSize:13, fontWeight:700, color:T.textPrimary }}>{c.visitCount} visit{c.visitCount!==1?"s":""}</div>
+        <div style={{ fontSize:13, fontWeight:700, color:T.textPrimary }}>{visits} visit{visits!==1?"s":""}</div>
         {c.totalSpent > 0 && <div style={{ fontSize:11, color:T.green }}>{money(c.totalSpent, 2)}</div>}
-        <div style={{ fontSize:10, color:T.textMuted, marginTop:1 }}>Last: {c.lastVisit}</div>
+        <div style={{ fontSize:10, color:T.textMuted, marginTop:1 }}>Last: {last || "—"}</div>
+        {next && <div style={{ fontSize:10, color:T.green, marginTop:1 }}>Next: {next}</div>}
       </div>
     </button>
   );
@@ -95,7 +122,7 @@ function CustomerProfile({ customer: c }) {
 
       {/* Stats grid */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(100px,1fr))", gap:8, marginBottom:16 }}>
-        <Stat label="Total visits"  value={c.visitCount}      color={T.blue}/>
+        <Stat label="Total visits"  value={visitInfo(c).visits} color={T.blue}/>
         <Stat label="Completed"     value={c.completedCount}  color={T.green}/>
         <Stat label="No-shows"      value={c.noShowCount||0}  color={T.red}/>
         <Stat label="Total spent"   value={c.totalSpent > 0 ? money(c.totalSpent, 2) : "—"} color={T.teal}/>
@@ -121,9 +148,11 @@ function CustomerProfile({ customer: c }) {
               <div key={b.id||b._id} style={{ background:T.elevated, border:`1px solid ${T.border}`, borderRadius:T.r8, padding:"9px 12px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                 <div style={{ flex:1, minWidth:0 }}>
                   <div style={{ fontSize:12, fontWeight:600, color:T.textPrimary, marginBottom:2 }}>{displaySvc(b)}</div>
-                  <div style={{ fontSize:10, color:T.textMuted, display:"flex", alignItems:"center", gap:6 }}>
-                    <CalIcon size={10} color={T.textMuted}/>{b.date} at {b.time}
-                    {b.tireSize && <><TireIcon size={10} color={T.textMuted}/>{b.tireSize}</>}
+                  {/* Wraps between date, time and tire size on narrow phones instead of breaking words */}
+                  <div style={{ fontSize:10, color:T.textMuted, display:"flex", alignItems:"center", columnGap:6, rowGap:2, flexWrap:"wrap" }}>
+                    <span style={{ display:"flex", alignItems:"center", gap:6, whiteSpace:"nowrap" }}><CalIcon size={10} color={T.textMuted}/>{b.date}</span>
+                    <span style={{ whiteSpace:"nowrap" }}>at {b.time}</span>
+                    {b.tireSize && <span style={{ display:"flex", alignItems:"center", gap:6, whiteSpace:"nowrap", minWidth:0, marginLeft:4 }}><TireIcon size={10} color={T.textMuted}/>{b.tireSize}</span>}
                   </div>
                 </div>
                 <div style={{ textAlign:"right", flexShrink:0, marginLeft:10 }}>
@@ -147,12 +176,23 @@ export default function CustomersPage({ onAlert }) {
   const [selected,  setSelected]  = useState(null);
   const [profile,   setProfile]   = useState(null);
   const [loadingP,  setLoadingP]  = useState(false);
+  const [error,     setError]     = useState("");
+  const reqId = useRef(0);
 
   const load = useCallback(async () => {
-    setLoading(true);
-    try { setCustomers(await fetchCustomers(search)); }
-    catch (e) { onAlert?.(e.message, "error"); }
-    finally { setLoading(false); }
+    const id = ++reqId.current; // ignore answers to older searches that arrive late
+    setLoading(true); setError("");
+    try {
+      const list = await fetchCustomers(search);
+      if (id !== reqId.current) return;
+      // Most actual visits first (the API's order breaks ties)
+      setCustomers((list || []).map((c, i) => [c, visitInfo(c).visits, i]).sort((a, b) => b[1] - a[1] || a[2] - b[2]).map(x => x[0]));
+    } catch (e) {
+      if (id !== reqId.current) return;
+      // Never leave the previous (unfiltered) list on screen as if it were the results
+      setCustomers([]); setError(e.message || "Could not load customers");
+      onAlert?.(e.message, "error");
+    } finally { if (id === reqId.current) setLoading(false); }
   }, [search]);
 
   useEffect(() => {
@@ -194,7 +234,15 @@ export default function CustomersPage({ onAlert }) {
         />
       </div>
 
-      {loading ? <Spinner/> : customers.length === 0 ? (
+      {loading ? <Spinner/> : error ? (
+        <div style={{ padding:"48px 0", textAlign:"center" }}>
+          <div style={{ fontSize:14, fontWeight:600, color:T.textPrimary, marginBottom:6 }}>
+            {search ? "Search failed" : "Could not load customers"}
+          </div>
+          <div style={{ fontSize:12, color:T.textMuted, marginBottom:14 }}>{error}</div>
+          <Btn small variant="ghost" onClick={load}>Try again</Btn>
+        </div>
+      ) : customers.length === 0 ? (
         <div style={{ padding:"64px 0", textAlign:"center" }}>
           <div style={{ width:48, height:48, borderRadius:"50%", background:T.elevated, border:`1px solid ${T.border}`, display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px" }}>
             <UsersIcon size={20} color={T.textMuted}/>

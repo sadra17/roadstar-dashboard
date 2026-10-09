@@ -155,13 +155,14 @@ function StepCode({ email, onSuccess, onBack }) {
       </div>
       {error && <Alert msg={error} />}
       {resent && <Alert msg="New code sent! Check your email." type="success" />}
-      <div style={{ display:"flex", gap:8, justifyContent:"center", marginBottom:24 }}>
+      {/* Boxes shrink to fit narrow phones (iPhone SE) instead of overflowing */}
+      <div style={{ display:"flex", gap:6, justifyContent:"center", marginBottom:24 }}>
         {digits.map((d, i) => (
           <input key={i} ref={refs[i]} type="text" inputMode="numeric"
             value={d} maxLength={6}
             onChange={e => handleDigit(i, e.target.value)}
             onKeyDown={e => handleKeyDown(i, e)}
-            style={{ width:44, height:54, textAlign:"center", fontSize:24, fontWeight:800,
+            style={{ flex:"1 1 0", minWidth:0, maxWidth:44, boxSizing:"border-box", padding:0, height:54, textAlign:"center", fontSize:24, fontWeight:800,
               background: T.pageBg, border:`2px solid ${d ? T.blue : T.border}`,
               borderRadius:10, color:T.text, fontFamily:T.font, outline:"none" }}
             onFocus={e=>e.target.style.borderColor=T.blue}
@@ -175,11 +176,11 @@ function StepCode({ email, onSuccess, onBack }) {
       </button>
       <div style={{ display:"flex", justifyContent:"space-between", marginTop:16, fontSize:12 }}>
         <button type="button" onClick={onBack}
-          style={{ background:"none", border:"none", color:T.textMuted, cursor:"pointer", fontFamily:T.font, fontSize:12 }}>
+          style={{ background:"none", border:"none", color:T.textMuted, cursor:"pointer", fontFamily:T.font, fontSize:12, minHeight:40, padding:"0 4px" }}>
           ← Change email
         </button>
         <button type="button" onClick={handleResend}
-          style={{ background:"none", border:"none", color:T.blue, cursor:"pointer", fontFamily:T.font, fontSize:12 }}>
+          style={{ background:"none", border:"none", color:T.blue, cursor:"pointer", fontFamily:T.font, fontSize:12, minHeight:40, padding:"0 4px" }}>
           Resend code
         </button>
       </div>
@@ -269,7 +270,7 @@ export default function LoginPage({ onLogin }) {
       justifyContent:"center", background:T.pageBg, fontFamily:T.font, padding:16 }}>
       <div style={{ width:"100%", maxWidth:step==="otp-code" ? 400 : 380,
         background:T.card, border:`1px solid ${T.borderVis}`,
-        borderRadius:20, padding:36, boxShadow:"0 8px 40px rgba(0,0,0,0.6)" }}>
+        borderRadius:20, padding:"clamp(20px, 7vw, 36px)", boxSizing:"border-box", boxShadow:"0 8px 40px rgba(0,0,0,0.6)" }}>
         <Logo />
         {step === "password"   && <StepPassword onSuccess={handleSuccess} onUseOtp={() => setStep("otp-email")} />}
         {step === "otp-email"  && <StepEmail   onSent={handleSent}    onUsePassword={() => setStep("password")} />}

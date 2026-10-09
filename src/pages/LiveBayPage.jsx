@@ -4,7 +4,7 @@
 // order to the front desk/owner to complete (with a price) — it does not auto-complete.
 import { useState, useEffect, useCallback } from "react";
 import { fetchLiveBay, baySnooze, extendBay, updateMechanic, bayStart, bayEnd, getToken, getUserRole } from "../api.js";
-import { getT, displaySvc, effectiveOcc } from "../theme.js";
+import { getT, displaySvc, effectiveOcc, byTime } from "../theme.js";
 import { Badge, Btn, IBtn, Modal, ModalTitle, PageHeader, Spinner, Empty, Card, RefreshIcon, BayIcon, FlagIcon, ClockIcon, CheckIcon, PlusIcon, WrenchIcon, NoteIcon } from "../components.jsx";
 
 export default function LiveBayPage({ onAlert }) {
@@ -20,7 +20,12 @@ export default function LiveBayPage({ onAlert }) {
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
-    try { const d = await fetchLiveBay(); setData(d || { active:[], ready:[], upcoming:[] }); }
+    try {
+      const d = await fetchLiveBay() || {};
+      // Sorted by actual clock time ("9:30 AM" before "1:00 PM"), not as text.
+      const sorted = arr => [...(arr || [])].sort(byTime);
+      setData({ ...d, active: sorted(d.active), ready: sorted(d.ready), upcoming: sorted(d.upcoming) });
+    }
     catch (e) { onAlert?.(e.message,"error"); }
     finally { setLoading(false); }
   }, []);

@@ -1,5 +1,5 @@
 // pages/AuditLogPage.jsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { fetchAuditLog } from "../api.js";
 import { getT } from "../theme.js";
 import { PageHeader, Spinner, Empty, Card, SearchIcon } from "../components.jsx";
@@ -11,17 +11,38 @@ export function AuditLogPage({ onAlert }) {
   const [page,    setPage]    = useState(1);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({ entity:"", action:"" });
+  const PER_PAGE = 50;
+  const goodPage = useRef(1); // last page that loaded — fall back to it if a fetch fails
 
   useEffect(() => {
     setLoading(true);
-    const p = { page, limit:50 };
+    const p = { page, limit:PER_PAGE };
     if (filters.entity) p.entity = filters.entity;
     if (filters.action) p.action = filters.action;
     fetchAuditLog(p)
-      .then(d => { setLogs(d.logs || []); setTotal(d.total || 0); })
-      .catch(e => onAlert?.(e.message,"error"))
+      .then(d => {
+        const t = d.total || 0, last = Math.max(1, Math.ceil(t / PER_PAGE));
+        setTotal(t);
+        // Past the end (log shrank, or a filter changed the count): go to the last page.
+        if (page > last && !(d.logs || []).length) { setPage(last); return; }
+        goodPage.current = page;
+        setLogs(d.logs || []);
+      })
+      .catch(e => { onAlert?.(e.message,"error"); if (page !== goodPage.current) setPage(goodPage.current); })
       .finally(() => setLoading(false));
   }, [page, filters]);
+
+  const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
+  const goPage = n => { setPage(Math.min(Math.max(1, n), totalPages)); window.scrollTo(0, 0); };
+  // "sms_sent" is an action (logged on entity "booking"), the rest are entities.
+  const CHIPS = [
+    { label:"All",      entity:"",        action:"" },
+    { label:"booking",  entity:"booking", action:"" },
+    { label:"setting",  entity:"setting", action:"" },
+    { label:"user",     entity:"user",    action:"" },
+    { label:"login",    entity:"login",   action:"" },
+    { label:"sms_sent", entity:"",        action:"sms_sent" },
+  ];
 
   const fmtTime = ts => new Date(ts).toLocaleString("en-CA",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
   const ACTION_COLOR = { created:T?.green||"#22C55E", deleted:T?.red||"#EF4444", updated:T?.blue||"#2563EB", status_changed:T?.amber||"#F59E0B", login_success:T?.teal||"#14B8A6", login_failed:T?.red||"#EF4444", sms_sent:T?.purple||"#8B5CF6" };
@@ -30,12 +51,15 @@ export function AuditLogPage({ onAlert }) {
     <div>
       <PageHeader title="Audit Log" sub={`${total} total events`}/>
       <div style={{ display:"flex", gap:8, marginBottom:14, flexWrap:"wrap" }}>
-        {["","booking","setting","user","login","sms_sent"].map(e => (
-          <button key={e} onClick={() => { setFilters(p=>({...p,entity:e})); setPage(1); }}
-            style={{ padding:"5px 12px", borderRadius:20, border:`1px solid ${filters.entity===e?T.blue:T.border}`, background:filters.entity===e?T.blueSubtle:"transparent", color:filters.entity===e?T.blueBright:T.textMuted, fontSize:11, fontFamily:T.font, cursor:"pointer" }}>
-            {e||"All"}
-          </button>
-        ))}
+        {CHIPS.map(c => {
+          const on = filters.entity === c.entity && filters.action === c.action;
+          return (
+            <button key={c.label} onClick={() => { goodPage.current = 1; setFilters({ entity:c.entity, action:c.action }); setPage(1); window.scrollTo(0, 0); }}
+              style={{ padding:"5px 12px", minHeight:36, borderRadius:20, border:`1px solid ${on?T.blue:T.border}`, background:on?T.blueSubtle:"transparent", color:on?T.blueBright:T.textMuted, fontSize:11, fontFamily:T.font, cursor:"pointer" }}>
+              {c.label}
+            </button>
+          );
+        })}
       </div>
       {loading ? <Spinner/> : logs.length === 0 ? (
         <Empty icon={null} title="No audit events" sub="Actions taken in the dashboard will appear here"/>
@@ -57,11 +81,11 @@ export function AuditLogPage({ onAlert }) {
               </div>
             </div>
           ))}
-          {total > logs.length && (
-            <div style={{ display:"flex", justifyContent:"center", gap:8, padding:"14px 0" }}>
-              {page > 1 && <button onClick={() => setPage(p=>p-1)} style={{ padding:"6px 14px", borderRadius:T.r8, border:`1px solid ${T.border}`, background:T.elevated, color:T.textSecond, fontSize:12, cursor:"pointer", fontFamily:T.font }}>← Prev</button>}
-              <span style={{ fontSize:12, color:T.textMuted, padding:"6px 0" }}>Page {page} · {total} total</span>
-              <button onClick={() => setPage(p=>p+1)} style={{ padding:"6px 14px", borderRadius:T.r8, border:`1px solid ${T.border}`, background:T.elevated, color:T.textSecond, fontSize:12, cursor:"pointer", fontFamily:T.font }}>Next →</button>
+          {totalPages > 1 && (
+            <div style={{ display:"flex", justifyContent:"center", alignItems:"center", gap:8, padding:"14px 0", flexWrap:"wrap" }}>
+              {page > 1 && <button onClick={() => goPage(page-1)} style={{ padding:"6px 14px", minHeight:40, borderRadius:T.r8, border:`1px solid ${T.border}`, background:T.elevated, color:T.textSecond, fontSize:12, cursor:"pointer", fontFamily:T.font }}>← Prev</button>}
+              <span style={{ fontSize:12, color:T.textMuted, padding:"6px 0" }}>Page {page} of {totalPages} · {total} total</span>
+              {page < totalPages && <button onClick={() => goPage(page+1)} style={{ padding:"6px 14px", minHeight:40, borderRadius:T.r8, border:`1px solid ${T.border}`, background:T.elevated, color:T.textSecond, fontSize:12, cursor:"pointer", fontFamily:T.font }}>Next →</button>}
             </div>
           )}
         </div>
@@ -73,9 +97,9 @@ export function AuditLogPage({ onAlert }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // pages/UsersPage.jsx
 // ─────────────────────────────────────────────────────────────────────────────
-import { fetchUsers, createUser, updateUser, deleteUser, resetPassword } from "../api.js";
+import { fetchUsers, createUser, updateUser, resetPassword, getUserId, getUserEmail, getUserRole } from "../api.js";
 import { Btn, IBtn, Modal, ModalTitle, Inp, Sel, Badge as BadgeComp, ConfirmModal, TrashIcon as TrashIconC } from "../components.jsx";
-import { CheckIcon, XIcon, PenIcon, TrashIcon, PlusIcon } from "../components.jsx";
+import { CheckIcon, XIcon, PenIcon, TrashIcon, PlusIcon, RestoreIcon } from "../components.jsx";
 
 export function UsersPage({ onAlert }) {
   const T = getT();
@@ -84,8 +108,16 @@ export function UsersPage({ onAlert }) {
   const [modal,       setModal]       = useState(null); // null | "create" | user object (edit)
   const [form,        setForm]        = useState({ name:"", email:"", password:"", role:"frontdesk" });
   const [busy,        setBusy]        = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState(null); // user object to confirm delete
+  const [deleteTarget, setDeleteTarget] = useState(null); // user object to confirm deactivate
   const [deleteBusy,   setDeleteBusy]   = useState(false);
+  // The logged-in user can't deactivate themselves or change their own role.
+  const myId = getUserId(), myEmail = getUserEmail();
+  const isMe = u => !!u && typeof u === "object" && ((myId && u.id === myId) || (myEmail && u.email?.toLowerCase() === myEmail.toLowerCase()));
+  // Only a super admin may hand out (or take away) the Super Admin role.
+  const amSuper = getUserRole() === "superadmin";
+  const ROLE_OPTS = [{value:"owner",label:"Owner"},{value:"frontdesk",label:"Front Desk"},{value:"mechanic",label:"Mechanic"},
+    ...(amSuper ? [{value:"superadmin",label:"Super Admin"}] : [])];
+  const roleLocked = u => isMe(u) || (!amSuper && u?.role === "superadmin");
 
   const load = () => {
     setLoading(true);
@@ -94,13 +126,24 @@ export function UsersPage({ onAlert }) {
   useEffect(load, []);
 
   const handleSave = async () => {
+    if (busy) return;
+    if (!form.name?.trim()) { onAlert?.("Enter the user's name.", "error"); return; }
+    if (modal === "create") {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((form.email || "").trim())) { onAlert?.("Enter a valid email address.", "error"); return; }
+      if ((form.password || "").length < 8) { onAlert?.("Password must be at least 8 characters.", "error"); return; }
+    }
     setBusy(true);
     try {
       if (modal === "create") {
-        await createUser(form);
+        await createUser({ ...form, name:form.name.trim(), email:form.email.trim() });
         onAlert?.("User created");
       } else {
-        await updateUser(modal.id, { name:form.name, role:form.role, active:form.active });
+        // Only send what may change: never your own role/active flag, and the
+        // role only when it was actually changed.
+        const upd = { name:form.name.trim() };
+        if (!isMe(modal)) upd.active = form.active;
+        if (!roleLocked(modal) && form.role !== modal.role) upd.role = form.role;
+        await updateUser(modal.id, upd);
         onAlert?.("User updated");
       }
       setModal(null); load();
@@ -119,22 +162,30 @@ export function UsersPage({ onAlert }) {
       {loading ? <Spinner/> : (
         <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
           {users.map(u => (
-            <div key={u.id} style={{ background:T.cardBg, border:`1px solid ${T.border}`, borderRadius:T.r10, padding:"12px 16px", display:"flex", alignItems:"center", gap:12 }}>
+            <div key={u.id} style={{ background:T.cardBg, border:`1px solid ${T.border}`, borderRadius:T.r10, padding:"12px 14px", display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
               <div style={{ width:38, height:38, borderRadius:"50%", background:`${ROLE_COLORS[u.role]||T.blue}20`, border:`1px solid ${ROLE_COLORS[u.role]||T.blue}40`, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:700, fontSize:13, color:ROLE_COLORS[u.role]||T.blue, flexShrink:0 }}>
                 {(u.name?.[0]||"?")}
               </div>
-              <div style={{ flex:1 }}>
-                <div style={{ fontSize:13, fontWeight:700, color:u.active?T.textPrimary:T.textMuted }}>{u.name}</div>
-                <div style={{ fontSize:11, color:T.textMuted }}>{u.email}</div>
+              <div style={{ flex:"1 1 150px", minWidth:0 }}>
+                <div style={{ fontSize:13, fontWeight:700, color:u.active?T.textPrimary:T.textMuted, overflowWrap:"anywhere" }}>{u.name}{isMe(u) && <span style={{ fontWeight:500, color:T.textMuted }}> (you)</span>}</div>
+                <div style={{ fontSize:11, color:T.textMuted, overflowWrap:"anywhere" }}>{u.email}</div>
                 {u.lastLoginAt && <div style={{ fontSize:10, color:T.textMuted }}>Last login: {new Date(u.lastLoginAt).toLocaleDateString()}</div>}
               </div>
-              <span style={{ fontSize:11, fontWeight:600, padding:"2px 8px", borderRadius:20, background:`${ROLE_COLORS[u.role]||T.blue}20`, color:ROLE_COLORS[u.role]||T.blue, border:`1px solid ${ROLE_COLORS[u.role]||T.blue}40` }}>
-                {ROLE_LABELS[u.role]||u.role}
-              </span>
-              {!u.active && <span style={{ fontSize:10, color:T.textMuted, background:T.elevated, padding:"2px 8px", borderRadius:20, border:`1px solid ${T.border}` }}>Inactive</span>}
-              <div style={{ display:"flex", gap:3 }}>
-                <IBtn v="edit" title="Edit" onClick={() => { setForm({name:u.name,email:u.email,password:"",role:u.role,active:u.active!==false}); setModal(u); }}><PenIcon size={14}/></IBtn>
-                <IBtn v="trash" title="Deactivate" onClick={() => setDeleteTarget(u)}><TrashIcon size={14}/></IBtn>
+              {/* Badges + actions wrap below the name on narrow phones */}
+              <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap", marginLeft:"auto" }}>
+                <span style={{ fontSize:11, fontWeight:600, padding:"2px 8px", borderRadius:20, background:`${ROLE_COLORS[u.role]||T.blue}20`, color:ROLE_COLORS[u.role]||T.blue, border:`1px solid ${ROLE_COLORS[u.role]||T.blue}40`, whiteSpace:"nowrap" }}>
+                  {ROLE_LABELS[u.role]||u.role}
+                </span>
+                {!u.active && <span style={{ fontSize:10, color:T.textMuted, background:T.elevated, padding:"2px 8px", borderRadius:20, border:`1px solid ${T.border}` }}>Inactive</span>}
+                <div style={{ display:"flex", gap:4 }}>
+                  <IBtn v="edit" title="Edit" onClick={() => { setForm({name:u.name,email:u.email,password:"",role:u.role,active:u.active!==false}); setModal(u); }}><PenIcon size={14}/></IBtn>
+                  {!isMe(u) && (u.active !== false
+                    ? <IBtn v="trash" title="Deactivate" onClick={() => setDeleteTarget(u)}><XIcon size={14}/></IBtn>
+                    : <IBtn v="restore" title="Re-activate" onClick={async () => {
+                        try { await updateUser(u.id, { active:true }); onAlert?.("User re-activated"); load(); }
+                        catch (e) { onAlert?.(e.message,"error"); }
+                      }}><RestoreIcon size={14}/></IBtn>)}
+                </div>
               </div>
             </div>
           ))}
@@ -149,12 +200,13 @@ export function UsersPage({ onAlert }) {
             {modal === "create" && <div><label style={{ fontSize:11, color:T.textMuted, display:"block", marginBottom:4, textTransform:"uppercase", letterSpacing:"0.06em", fontWeight:600 }}>Email</label><Inp type="email" value={form.email} onChange={e=>setForm(p=>({...p,email:e.target.value}))} placeholder="email@shop.com"/></div>}
             {modal === "create" && <div><label style={{ fontSize:11, color:T.textMuted, display:"block", marginBottom:4, textTransform:"uppercase", letterSpacing:"0.06em", fontWeight:600 }}>Password</label><Inp type="password" value={form.password} onChange={e=>setForm(p=>({...p,password:e.target.value}))} placeholder="Min 8 characters"/></div>}
             <div><label style={{ fontSize:11, color:T.textMuted, display:"block", marginBottom:4, textTransform:"uppercase", letterSpacing:"0.06em", fontWeight:600 }}>Role</label>
-              <Sel value={form.role} onChange={e=>setForm(p=>({...p,role:e.target.value}))}
-                options={[{value:"owner",label:"Owner"},{value:"frontdesk",label:"Front Desk"},{value:"mechanic",label:"Mechanic"}]}/>
+              {modal !== "create" && roleLocked(modal)
+                ? <div style={{ fontSize:12, color:T.textMuted, padding:"4px 0" }}>{ROLE_LABELS[form.role]||form.role} — {isMe(modal) ? "you can't change your own role." : "only a Super Admin can change this role."}</div>
+                : <Sel value={form.role} onChange={e=>setForm(p=>({...p,role:e.target.value}))} options={modal === "create" ? ROLE_OPTS.filter(o => o.value !== "superadmin") : ROLE_OPTS}/>}
             </div>
-            {modal !== "create" && (
+            {modal !== "create" && !isMe(modal) && (
               <label style={{ display:"flex", alignItems:"center", gap:8, cursor:"pointer", fontSize:13, color:T.textSecond }}>
-                <input type="checkbox" checked={form.active!==false} onChange={e=>setForm(p=>({...p,active:e.target.checked}))} style={{ width:14, height:14, accentColor:T.green }}/>
+                <input type="checkbox" checked={form.active!==false} onChange={e=>setForm(p=>({...p,active:e.target.checked}))} style={{ width:18, height:18, accentColor:T.green }}/>
                 Account active
               </label>
             )}
@@ -166,18 +218,18 @@ export function UsersPage({ onAlert }) {
         </Modal>
       )}
 
-      {/* Delete user confirmation */}
+      {/* Deactivate user confirmation — sets active:false (soft), never deletes */}
       {deleteTarget && (
         <ConfirmModal
           title={`Deactivate ${deleteTarget.name}?`}
           message={`This will disable ${deleteTarget.email}'s access immediately. You can re-activate them later by editing the account.`}
           confirmLabel="Yes, deactivate"
           confirmVariant="danger"
-          icon={<TrashIcon size={22} color={T.red}/>}
+          icon={<XIcon size={22} color={T.red}/>}
           busy={deleteBusy}
           onConfirm={async () => {
             setDeleteBusy(true);
-            try { await deleteUser(deleteTarget.id); onAlert?.("User deactivated"); setDeleteTarget(null); load(); }
+            try { await updateUser(deleteTarget.id, { active:false }); onAlert?.("User deactivated"); setDeleteTarget(null); load(); }
             catch (e) { onAlert?.(e.message,"error"); }
             finally { setDeleteBusy(false); }
           }}

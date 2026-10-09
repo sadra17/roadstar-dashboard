@@ -1,7 +1,7 @@
 // SettingsPage.jsx — with Error Boundary + debug output to find the real crash
 import { useState, useEffect, useCallback, useRef, Component } from "react";
 import { fetchSettings, updateSettings } from "./api.js";
-import { getT } from "./theme.js"; // FE1: use shared theme token helper, not a local copy
+import { getT, getTheme } from "./theme.js"; // FE1: use shared theme token helper, not a local copy
 
 // ── Error Boundary — catches React component rendering errors ─────────────────
 class SectionErrorBoundary extends Component {
@@ -64,6 +64,61 @@ function SectionTitle({children, sub}) {
       {sub && <div style={{fontSize:12,color:T.textMuted,marginTop:4,lineHeight:1.5}}>{sub}</div>}
     </div>
   );
+}
+
+// ── Number input that only clamps when you leave the field ────────────────────
+// Clamping on every keystroke turned "15" into "55" (the "1" was pushed up to the
+// minimum before the "5" arrived), and clearing a field saved 0. The raw text is
+// kept while typing; valid in-range values are passed up straight away (so
+// "Unsaved changes" shows) and the value is clamped on blur, which also runs
+// before a Save click lands.
+function NumInput({ value, onChange, min = 0, max = Infinity, step = 1, style }) {
+  const [txt, setTxt] = useState(value == null ? "" : String(value));
+  const [focus, setFocus] = useState(false);
+  useEffect(() => { if (!focus) setTxt(value == null ? "" : String(value)); }, [value, focus]);
+  const clamp = n => Math.min(max, Math.max(min, n));
+  return (
+    <input type="number" inputMode="decimal" min={min} max={Number.isFinite(max) ? max : undefined} step={step} value={txt}
+      onFocus={() => setFocus(true)}
+      onChange={e => {
+        const t = e.target.value; setTxt(t);
+        const n = Number(t);
+        if (t !== "" && Number.isFinite(n) && n >= min && n <= max && n !== value) onChange(n);
+      }}
+      onBlur={() => {
+        setFocus(false);
+        const n = Number(txt);
+        // Empty / invalid → keep the last good value; out of range → clamp.
+        const next = txt.trim() === "" || !Number.isFinite(n) ? clamp(Number(value) || 0) : clamp(n);
+        setTxt(String(next));
+        if (next !== value) onChange(next);
+      }}
+      style={style}/>
+  );
+}
+
+// Native time/date pickers follow the dashboard theme (icons were invisible in light mode).
+const pickerScheme = () => (getTheme() === "light" ? "light" : "dark");
+
+// Checks the settings before they are sent, so the booking form never gets a
+// 0-minute service, a day that closes before it opens or an empty blackout date.
+// Returns an error message, or "" when everything is fine.
+function validateSettings(s) {
+  const h = s.hours || {};
+  for (let i = 0; i < 7; i++) {
+    const dh = h[i] || h[String(i)];
+    if (dh && dh.open && dh.close && dh.close <= dh.open)
+      return `${DAYS[i]}: closing time must be after opening time.`;
+  }
+  for (const svc of s.services || []) {
+    const dur = Number(svc.serviceDuration ?? svc.service_duration ?? 30);
+    const rec = Number(svc.equipmentRecoveryTime ?? svc.equipment_recovery_time ?? 0);
+    const nm  = (svc.name || "").trim() || "A service";
+    if (!(svc.name || "").trim()) return "Every service needs a name.";
+    if (!Number.isFinite(dur) || dur < 5) return `${nm}: duration must be at least 5 minutes.`;
+    if (!Number.isFinite(rec) || rec < 0) return `${nm}: recovery time can't be negative.`;
+  }
+  return "";
 }
 
 // ── BUSINESS SECTION ──────────────────────────────────────────────────────────
@@ -139,11 +194,11 @@ function HoursSection({s, set}) {
                 <>
                   <input type="time" value={dh.open || "09:00"} onChange={e => set(`hours.${i}.open`, e.target.value)}
                     style={{background:T.pageBg,border:`1.5px solid ${T.border}`,borderRadius:T.r8,
-                      padding:"7px 10px",color:T.textPrimary,fontSize:12,fontFamily:T.font,outline:"none",colorScheme:"dark"}}/>
+                      padding:"7px 10px",color:T.textPrimary,fontSize:12,fontFamily:T.font,outline:"none",colorScheme:pickerScheme()}}/>
                   <span style={{color:T.textMuted,fontSize:12}}>to</span>
                   <input type="time" value={dh.close || "18:00"} onChange={e => set(`hours.${i}.close`, e.target.value)}
                     style={{background:T.pageBg,border:`1.5px solid ${T.border}`,borderRadius:T.r8,
-                      padding:"7px 10px",color:T.textPrimary,fontSize:12,fontFamily:T.font,outline:"none",colorScheme:"dark"}}/>
+                      padding:"7px 10px",color:T.textPrimary,fontSize:12,fontFamily:T.font,outline:"none",colorScheme:pickerScheme()}}/>
                 </>
               )}
             </div>
@@ -167,7 +222,7 @@ function BlackoutSection({s, set}) {
           <div key={i} style={{display:"flex",gap:8,alignItems:"center"}}>
             <input type="date" value={d || ""} onChange={e => {const dd=[...dates];dd[i]=e.target.value;set("blackoutDates",dd);}}
               style={{background:T.pageBg,border:`1.5px solid ${T.border}`,borderRadius:T.r8,
-                padding:"9px 12px",color:T.textPrimary,fontSize:13,fontFamily:T.font,outline:"none",colorScheme:"dark"}}/>
+                padding:"9px 12px",color:T.textPrimary,fontSize:13,fontFamily:T.font,outline:"none",colorScheme:pickerScheme()}}/>
             <button onClick={() => set("blackoutDates", dates.filter((_,j) => j!==i))}
               style={{background:T.redBg,border:`1px solid ${T.redBorder}`,borderRadius:T.r8,
                 padding:"9px 14px",color:T.redText,fontSize:12,fontFamily:T.font,cursor:"pointer"}}>Remove</button>
@@ -221,13 +276,13 @@ function ServicesSection({s, set}) {
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(100px,1fr))",gap:8}}>
                 <div>
                   <div style={{fontSize:10,color:T.textMuted,marginBottom:4,textTransform:"uppercase",letterSpacing:"0.06em"}}>Duration (min)</div>
-                  <input type="number" value={dur} onChange={e => {const n=Number(e.target.value);const sv=[...svcs];sv[i]={...sv[i],serviceDuration:n,service_duration:n};set("services",sv);}}
+                  <NumInput value={dur} min={5} max={600} step={5} onChange={n => {const sv=[...svcs];sv[i]={...sv[i],serviceDuration:n,service_duration:n};set("services",sv);}}
                     style={{width:"100%",background:T.pageBg,border:`1.5px solid ${T.border}`,borderRadius:T.r8,
                       padding:"9px 10px",color:T.textPrimary,fontSize:13,fontFamily:T.font,outline:"none",boxSizing:"border-box"}}/>
                 </div>
                 <div>
                   <div style={{fontSize:10,color:T.textMuted,marginBottom:4,textTransform:"uppercase",letterSpacing:"0.06em"}}>Recovery (min)</div>
-                  <input type="number" value={rec} onChange={e => {const n=Number(e.target.value);const sv=[...svcs];sv[i]={...sv[i],equipmentRecoveryTime:n,equipment_recovery_time:n};set("services",sv);}}
+                  <NumInput value={rec} min={0} max={240} onChange={n => {const sv=[...svcs];sv[i]={...sv[i],equipmentRecoveryTime:n,equipment_recovery_time:n};set("services",sv);}}
                     style={{width:"100%",background:T.pageBg,border:`1.5px solid ${T.border}`,borderRadius:T.r8,
                       padding:"9px 10px",color:T.textPrimary,fontSize:13,fontFamily:T.font,outline:"none",boxSizing:"border-box"}}/>
                 </div>
@@ -263,8 +318,8 @@ function CapacitySection({s, set}) {
       <SectionTitle sub="Controls simultaneous booking slots — live on the booking form.">Capacity</SectionTitle>
       <Field label="Normal bay count" hint="Each confirmed booking uses one bay slot">
         <div style={{display:"flex",alignItems:"center",gap:12}}>
-          <input type="number" min="1" max="20" value={s.bayCount || 3}
-            onChange={e => set("bayCount", Math.max(1, Number(e.target.value)))}
+          <NumInput min={1} max={20} value={s.bayCount || 3}
+            onChange={n => set("bayCount", n)}
             style={{width:80,background:T.pageBg,border:`1.5px solid ${T.border}`,borderRadius:T.r8,
               padding:"10px 12px",color:T.textPrimary,fontSize:13,fontFamily:T.font,outline:"none"}}/>
           <span style={{fontSize:12,color:T.textMuted}}>{s.bayCount || 3} bay{(s.bayCount||3)!==1?"s":""}</span>
@@ -282,8 +337,8 @@ function CapacitySection({s, set}) {
       </Field>
       {s.alignmentLaneEnabled !== false && (
         <Field label="Alignment capacity" hint="Usually 1">
-          <input type="number" min="1" value={s.alignmentCapacity || 1}
-            onChange={e => set("alignmentCapacity", Math.max(1, Number(e.target.value)))}
+          <NumInput min={1} max={20} value={s.alignmentCapacity || 1}
+            onChange={n => set("alignmentCapacity", n)}
             style={{width:80,background:T.pageBg,border:`1.5px solid ${T.border}`,borderRadius:T.r8,
               padding:"10px 12px",color:T.textPrimary,fontSize:13,fontFamily:T.font,outline:"none"}}/>
         </Field>
@@ -449,8 +504,8 @@ function RemindersSection({s, set}) {
         {on && (
           <div style={{display:"flex",alignItems:"center",gap:10,paddingTop:4,borderTop:`1px solid ${T.border}`}}>
             <span style={{fontSize:12,color:T.textMuted,flexShrink:0}}>Send</span>
-            <input type="number" min="5" max="240" value={s.reminderMinutes || 30}
-              onChange={e => set("reminderMinutes", Math.max(5, Math.min(240, Number(e.target.value))))}
+            <NumInput min={5} max={240} value={s.reminderMinutes || 30}
+              onChange={n => set("reminderMinutes", n)}
               style={{width:68,background:T.pageBg,border:`1.5px solid ${T.border}`,borderRadius:T.r8,
                 padding:"8px 10px",color:T.textPrimary,fontSize:13,fontFamily:T.font,outline:"none",textAlign:"center"}}/>
             <span style={{fontSize:12,color:T.textMuted}}>minutes before</span>
@@ -500,7 +555,7 @@ function BrandingSection({s, set}) {
 // ── Section map ───────────────────────────────────────────────────────────────
 
 // ── Main component ─────────────────────────────────────────────────────────────
-export default function SettingsPage({onAlert}) {
+export default function SettingsPage({onAlert, onDirtyChange}) {
   const T = getT();
   const [s,     setS]   = useState(null);
   const [load,  setLoad]= useState(true);
@@ -527,6 +582,17 @@ export default function SettingsPage({onAlert}) {
       .finally(() => setLoad(false));
   }, []);
 
+  // Tell the shell about unsaved edits (it asks before navigating away) and
+  // warn on reload / tab close.
+  useEffect(() => {
+    onDirtyChange?.(dirty);
+    if (!dirty) return;
+    const fn = e => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", fn);
+    return () => window.removeEventListener("beforeunload", fn);
+  }, [dirty]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => onDirtyChange?.(false), []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const set = useCallback((path, val) => {
     setS(prev => {
       if (!prev) return prev;
@@ -545,9 +611,16 @@ export default function SettingsPage({onAlert}) {
   }, []);
 
   const save = async () => {
+    if (sav) return;
+    // Blank "+ Add date" rows are just unused — drop them instead of saving "".
+    const payload = Array.isArray(s.blackoutDates)
+      ? { ...s, blackoutDates: s.blackoutDates.filter(d => typeof d === "string" && d.trim()) }
+      : s;
+    const bad = validateSettings(payload);
+    if (bad) { setErr(bad); onAlert?.(bad, "error"); return; }
     setSav(true); setErr("");
     try {
-      const updated = await updateSettings(s);
+      const updated = await updateSettings(payload);
       setS(updated); setSaved(true); setDirty(false);
       onAlert?.("Settings saved — changes are live on the booking form.");
       setTimeout(() => setSaved(false), 3000);
@@ -586,7 +659,7 @@ export default function SettingsPage({onAlert}) {
             onClick={() => { setSec(id); if (mob) setMobC(true); if(contentRef.current) contentRef.current.scrollTop=0; window.scrollTo(0,0); }}
             style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",
               padding:"12px 16px",background:a?T.elevated:"transparent",border:"none",
-              borderLeft:`3px solid ${a?T.blue:"transparent"}`,color:a?T.textPrimary:T.textMuted,
+              borderLeft:`3px solid ${a?T.blue:"transparent"}`,color:a?T.textPrimary:T.textSecond,
               fontSize:13,fontFamily:T.font,cursor:"pointer",textAlign:"left",
               borderBottom:`1px solid ${T.border}`,transition:"all .12s"}}>
             <span style={{fontWeight:a?600:400}}>{label}</span>

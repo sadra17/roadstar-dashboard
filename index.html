@@ -33,6 +33,9 @@
       body { margin: 0; background: #080c14; }
       /* Prevent flash of unstyled content while React loads */
       #root:empty { display: none; }
+      /* No native pull-to-refresh / scroll chaining: a swipe inside a modal must
+         never reload the page. The dashboard has its own modal-aware refresh. */
+      html, body { overscroll-behavior-y: none; }
     </style>
   </head>
   <body>

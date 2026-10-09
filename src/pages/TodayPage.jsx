@@ -1,7 +1,7 @@
 // pages/TodayPage.jsx — no emoji, SVG icons throughout
 import { useState, useEffect, useCallback } from "react";
 import { fetchBookings, fetchLiveBay, updateBooking, updatePayment, baySnooze, extendBay, bayStart, bayEnd, getUserRole, fetchSettings, updateMechanic } from "../api.js";
-import { getT, sm, displaySvc, effectiveOcc, todayStr, formatTireSize } from "../theme.js";
+import { getT, sm, displaySvc, effectiveOcc, todayStr, formatTireSize, byTime } from "../theme.js";
 import { Badge, Btn, IBtn, Modal, ModalTitle, Sel, Inp, StatCard, PageHeader, Spinner, CheckIcon, XIcon, FlagIcon, ClockIcon, BayIcon, RefreshIcon, PlusIcon, ConfirmModal, CompleteOrderModal, TrashIcon, WrenchIcon, NoteIcon } from "../components.jsx";
 
 // A car is "Live at Bay" once a mechanic presses Start, and "Done" once they
@@ -28,9 +28,29 @@ async function createWalkIn(form) {
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
     body: JSON.stringify({ ...form, shopId }),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || "Failed to create booking");
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.message || validationMessage(data.errors) || "Failed to create booking");
   return data;
+}
+
+// Older APIs return only errors:[{field,message}] on a 422 — name the fields to fix.
+const FIELD_LABELS = { firstName:"first name", lastName:"last name", phone:"phone number", email:"email address", service:"service", date:"date", time:"time", tireSize:"tire size", tireQuantity:"number of tires" };
+function validationMessage(errors) {
+  if (!Array.isArray(errors) || !errors.length) return "";
+  const fields = [...new Set(errors.map(e => FIELD_LABELS[e.field] || e.field).filter(Boolean))];
+  return fields.length ? `Please check the ${fields.join(", ")}.` : "";
+}
+
+// True on phone-width screens; used to stack queue-row actions under the details.
+function useNarrow(bp = 600) {
+  const get = () => typeof window !== "undefined" && window.innerWidth < bp;
+  const [narrow, setNarrow] = useState(get);
+  useEffect(() => {
+    const fn = () => setNarrow(get());
+    window.addEventListener("resize", fn);
+    return () => window.removeEventListener("resize", fn);
+  }, [bp]);
+  return narrow;
 }
 
 
@@ -134,9 +154,12 @@ function QueueRow({ b, onConfirm, onCancel, onComplete, onStart, onFinish, onNot
   const act = async (fn) => { setBusy(true); try { await fn(); } finally { setBusy(false); } };
   // Ready to start = confirmed, needs a bay, not already in/through a bay.
   const canStart = !bay && b.status === "confirmed" && b.resourcePool !== "none";
+  // Phones: badge + action buttons drop to their own row under the details.
+  const narrow = useNarrow(600);
   return (
-    <div style={{ background:T.cardBg, borderLeft:`3px solid ${s.color}`, border:`1px solid ${T.border}`, borderRadius:T.r10, opacity:busy?0.6:1 }}>
-      <div style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 16px" }}>
+    // borderLeft must come after the `border` shorthand or it gets overridden.
+    <div style={{ background:T.cardBg, border:`1px solid ${T.border}`, borderLeft:`3px solid ${s.color}`, borderRadius:T.r10, opacity:busy?0.6:1 }}>
+      <div style={{ display:"flex", flexWrap:"wrap", alignItems:"center", gap:narrow ? 10 : 12, padding:narrow ? "12px" : "12px 16px" }}>
         {/* Time block */}
         <div style={{ flexShrink:0, minWidth:60, textAlign:"center", padding:"7px 10px", background:T.elevated, borderRadius:T.r8, border:`1px solid ${T.border}` }}>
           <div style={{ fontSize:13, fontWeight:800, color:T.textPrimary, letterSpacing:"-0.02em" }}>{b.time}</div>
@@ -144,7 +167,7 @@ function QueueRow({ b, onConfirm, onCancel, onComplete, onStart, onFinish, onNot
         </div>
         {/* Info */}
         <div style={{ flex:1, minWidth:0 }}>
-          <div style={{ fontSize:13, fontWeight:700, color:T.textPrimary, marginBottom:1, display:"flex", alignItems:"center", gap:6 }}>
+          <div style={{ fontSize:13, fontWeight:700, color:T.textPrimary, marginBottom:1, display:"flex", flexWrap:"wrap", alignItems:"center", gap:6 }}>
             {b.firstName} {b.lastName}
             <SourceTag source={b.source}/>
           </div>
@@ -155,10 +178,11 @@ function QueueRow({ b, onConfirm, onCancel, onComplete, onStart, onFinish, onNot
               {b.tireSize || "—"}{b.tireQuantity ? ` · ${b.tireQuantity} tires` : ""}
             </div>
           )}
-          {b.phone && <div style={{ fontSize:10, color:T.textMuted, marginTop:1 }}>{b.phone}</div>}
+          {b.phone && <div style={{ fontSize:10, color:T.textMuted, marginTop:1, whiteSpace:"nowrap" }}>{b.phone}</div>}
         </div>
+        <div style={{ display:"flex", alignItems:"center", gap:8, flexShrink:0, ...(narrow ? { flexBasis:"100%", flexWrap:"wrap", paddingTop:10, borderTop:`1px solid ${T.border}` } : {}) }}>
         {bay ? <BayPill kind={bay}/> : <Badge status={b.status}/>}
-        <div style={{ display:"flex", gap:3, alignItems:"center" }}>
+        <div style={{ display:"flex", gap:3, alignItems:"center", marginLeft:narrow ? "auto" : 0 }}>
           {/* Start / Finished — available to everyone, including mechanics */}
           {canStart && onStart && (
             <Btn small variant="primary" icon={<BayIcon size={12} color="#fff"/>} disabled={busy}
@@ -187,10 +211,11 @@ function QueueRow({ b, onConfirm, onCancel, onComplete, onStart, onFinish, onNot
             </>
           )}
         </div>
+        </div>
       </div>
       {/* Admin/customer note — visible to all roles (incl. mechanic) if set */}
       {b.notes && (
-        <div style={{ margin:"0 16px 10px", padding:"7px 10px", background:T.elevated, borderRadius:T.r8,
+        <div style={{ margin:narrow ? "0 12px 10px" : "0 16px 10px", padding:"7px 10px", background:T.elevated, borderRadius:T.r8,
           display:"flex", alignItems:"flex-start", gap:6, border:`1px solid ${T.border}` }}>
           <NoteIcon size={11} color={T.textMuted}/>
           <span style={{ fontSize:11, color:T.textSecond, lineHeight:1.5 }}><b style={{ color:T.textMuted }}>Note:</b> {b.notes}</span>
@@ -198,7 +223,7 @@ function QueueRow({ b, onConfirm, onCancel, onComplete, onStart, onFinish, onNot
       )}
       {/* Mechanic notes — visible to all roles if set */}
       {b.mechanicNotes && (
-        <div style={{ margin:"0 16px 10px", padding:"7px 10px", background:T.elevated, borderRadius:T.r8,
+        <div style={{ margin:narrow ? "0 12px 10px" : "0 16px 10px", padding:"7px 10px", background:T.elevated, borderRadius:T.r8,
           display:"flex", alignItems:"flex-start", gap:6, border:`1px solid ${T.border}` }}>
           <WrenchIcon size={11} color={T.textMuted}/>
           <span style={{ fontSize:11, color:T.textSecond, lineHeight:1.5 }}><b style={{ color:T.textMuted }}>Mechanic:</b> {b.mechanicNotes}</span>
@@ -243,7 +268,7 @@ function MechanicNoteModal({ booking, onClose, onSave }) {
 function WalkInModal({ onClose, onSave, services }) {
   const T = getT();
   const svcList = services?.length ? services : DEFAULT_SERVICES;
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayIso = todayStr();
 
   const [form, setForm] = useState({
     firstName:"", lastName:"", phone:"", email:"",
@@ -275,7 +300,7 @@ function WalkInModal({ onClose, onSave, services }) {
         const avail = d.available || [];
         setSlots(avail);
         // Auto-pick the first slot at or after now (for today), otherwise first slot
-        const isToday = form.date === new Date().toISOString().slice(0, 10);
+        const isToday = form.date === todayStr();
         const nowMins = isToday ? (new Date().getHours() * 60 + new Date().getMinutes()) : 0;
         const picked = avail.find(t => {
           const [tp, period] = [t.slice(0, t.lastIndexOf(" ")), t.slice(t.lastIndexOf(" ") + 1)];
@@ -311,7 +336,7 @@ function WalkInModal({ onClose, onSave, services }) {
     <Modal onClose={onClose} wide persistent>
       <ModalTitle sub="Creates a confirmed booking directly — no Shopify form needed">Walk-in / Manual Booking</ModalTitle>
       {err && <div style={{ background:T.redBg, border:`1px solid ${T.redBorder}`, borderRadius:T.r8, padding:"9px 12px", fontSize:12, color:T.redText, marginBottom:12 }}>{err}</div>}
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:12 }}>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,240px),1fr))", gap:12, marginBottom:12 }}>
         <div><Lbl>First name *</Lbl><Inp value={form.firstName} onChange={e=>sf("firstName",e.target.value)} placeholder="John"/></div>
         <div><Lbl>Last name *</Lbl><Inp value={form.lastName} onChange={e=>sf("lastName",e.target.value)} placeholder="Smith"/></div>
         <div><Lbl>Phone *</Lbl><Inp type="tel" value={form.phone} onChange={e=>sf("phone",e.target.value)} placeholder="+1 (416) 555-0000"/></div>
@@ -321,7 +346,7 @@ function WalkInModal({ onClose, onSave, services }) {
         <Lbl>Service</Lbl>
         <Sel value={form.service} onChange={e=>sf("service",e.target.value)} options={svcList.map(s=>({value:s,label:s}))}/>
       </div>
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:12, marginBottom:12 }}>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,150px),1fr))", gap:12, marginBottom:12 }}>
         <div><Lbl>Date</Lbl><Inp type="date" value={form.date} onChange={e=>sf("date",e.target.value)} style={{colorScheme:"dark"}}/></div>
         <div>
           <Lbl>Time {slotsLoading && <span style={{ fontWeight:400, textTransform:"none", letterSpacing:0 }}>— loading…</span>}</Lbl>
@@ -337,11 +362,11 @@ function WalkInModal({ onClose, onSave, services }) {
             <Sel value={form.time} onChange={e=>sf("time",e.target.value)} options={slots.map(t=>({value:t,label:t}))}/>
           )}
         </div>
-        <div><Lbl>Tire size</Lbl><Inp value={form.tireSize} onChange={e=>sf("tireSize",formatTireSize(e.target.value))} placeholder="225/65R17" style={{ fontSize:16, fontWeight:600, letterSpacing:"0.02em" }}/></div>
+        <div><Lbl>Tire size</Lbl><Inp value={form.tireSize} onChange={e=>sf("tireSize",formatTireSize(e.target.value, e.target.selectionStart === e.target.value.length))} placeholder="225/65R17" style={{ fontSize:16, fontWeight:600, letterSpacing:"0.02em" }}/></div>
       </div>
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:12, marginBottom:16 }}>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,150px),1fr))", gap:12, marginBottom:16 }}>
         <div><Lbl>How many tires</Lbl><Inp type="number" value={form.tireQuantity} onChange={e=>sf("tireQuantity",e.target.value)} placeholder="e.g. 4"/></div>
-        <div><Lbl>Price ($)</Lbl><Inp type="number" value={form.price} onChange={e=>sf("price",e.target.value)} placeholder="0.00"/></div>
+        <div><Lbl>Quoted price ($)</Lbl><Inp type="number" value={form.price} onChange={e=>sf("price",e.target.value)} placeholder="0.00"/></div>
         <div>
           <Lbl>Initial status</Lbl>
           <Sel value={form.status} onChange={e=>sf("status",e.target.value)} options={[{value:"confirmed",label:"Confirmed"},{value:"pending",label:"Pending"}]}/>
@@ -509,7 +534,7 @@ export default function TodayPage({ onAlert }) {
         </div>
       ) : (
         <div style={{ display:"flex", flexDirection:"column", gap:7 }}>
-          {[...active].sort((a,b) => a.time.localeCompare(b.time)).map(b => (
+          {[...active].sort(byTime).map(b => (
             <QueueRow key={b.id} b={b}
               readOnly={isMechanic}
               onNote={isMechanic ? setNoteB : null}
@@ -533,9 +558,12 @@ export default function TodayPage({ onAlert }) {
             const body = { ...rest };
             if (tireQuantity !== "" && tireQuantity != null) body.tireQuantity = parseInt(tireQuantity, 10);
             const res = await createWalkIn(body);
-            // Price isn't part of /book — record it as a payment on the new booking.
+            // Price isn't part of /book — record it as the quoted price on the new
+            // booking. It stays unpaid until the order is completed (the Complete
+            // Order modal pre-fills finalPrice and records the actual payment).
             if (price !== "" && price != null && res?.booking?.id) {
-              try { await updatePayment(res.booking.id, { finalPrice: parseFloat(price), paymentStatus: "paid" }); }
+              const p = parseFloat(price);
+              try { await updatePayment(res.booking.id, { quotedPrice: p, finalPrice: p, paymentStatus: "unpaid" }); }
               catch (e) { onAlert?.("Booking made, but price didn't save: " + e.message, "error"); }
             }
             onAlert?.("Walk-in booking created");
@@ -573,7 +601,8 @@ export default function TodayPage({ onAlert }) {
           confirmVariant="danger"
           icon={<XIcon size={22} color={T.red}/>}
           onConfirm={async () => {
-            await act(cancelB.id, { status:"cancelled" });
+            // The dialog promises no SMS — don't let the API send the "declined" text.
+            await act(cancelB.id, { status:"cancelled", sendSMS:false });
             onAlert?.("Booking cancelled");
             setCancelB(null);
           }}

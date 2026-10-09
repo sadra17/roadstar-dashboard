@@ -82,6 +82,7 @@ export default function RoadstarDashboard({ onLogout }) {
   const bannerId      = useRef(0);
   const knownPending  = useRef(null); // null = first load (don't alert)
   const soundMutedRef = useRef(soundMuted);
+  const settingsDirty = useRef(false); // SettingsPage reports unsaved edits here
   useEffect(() => { soundMutedRef.current = soundMuted; }, [soundMuted]);
 
   // ── Unlock Web Audio on first tap/click (browser autoplay policy) ─────────
@@ -177,7 +178,16 @@ export default function RoadstarDashboard({ onLogout }) {
     document.body.style.background = next === "light" ? LIGHT.pageBg : DARK.pageBg;
   };
 
-  const navigate = (id) => { setPage(id); setDrawer(false); };
+  // Ask before leaving Settings with unsaved edits.
+  const confirmLeave = () =>
+    !settingsDirty.current || window.confirm("You have unsaved settings changes. Leave without saving?");
+  const confirmLeaveRef = useRef(confirmLeave);
+  confirmLeaveRef.current = confirmLeave;
+  const navigate = (id) => {
+    if (id !== page && !confirmLeave()) return;
+    if (id !== page) settingsDirty.current = false;
+    setPage(id); setDrawer(false);
+  };
 
   // Apply global styles
   useEffect(() => {
@@ -192,6 +202,9 @@ export default function RoadstarDashboard({ onLogout }) {
       ::-webkit-scrollbar { width: 5px; height: 5px; }
       ::-webkit-scrollbar-track { background: ${T.pageBg}; }
       ::-webkit-scrollbar-thumb { background: ${T.border}; border-radius: 3px; }
+      /* Disable the browser's own pull-to-refresh / scroll chaining — the
+         dashboard has its own pull-to-refresh below that ignores modals. */
+      html, body { overscroll-behavior-y: none; }
     `;
     document.getElementById("rs-global")?.remove();
     document.head.appendChild(style);
@@ -208,24 +221,46 @@ export default function RoadstarDashboard({ onLogout }) {
       transition:transform .15s;pointer-events:none;`;
     document.body.appendChild(indicator);
 
-    const onStart = e => { if (window.scrollY <= 0) { startY = e.touches[0].clientY; pulling = true; fired = false; } };
+    // Only arm when the touch starts on the page itself: never inside a modal,
+    // the drawer, a toast or any scroll container that is not at its top —
+    // otherwise scrolling a modal back up would reload and wipe the form.
+    const blocked = target => {
+      for (let el = target; el && el !== document.body; el = el.parentElement) {
+        if (el.nodeType !== 1) continue;
+        const cs = getComputedStyle(el);
+        if (cs.position === "fixed") return true;
+        if (/(auto|scroll)/.test(cs.overflowY) && el.scrollHeight > el.clientHeight && el.scrollTop > 0) return true;
+      }
+      return false;
+    };
+    const onStart = e => {
+      pulling = false; fired = false;
+      if (e.touches.length !== 1 || window.scrollY > 0 || blocked(e.target)) return;
+      startY = e.touches[0].clientY; pulling = true;
+    };
     const onMove = e => {
       if (!pulling) return;
       const dy = e.touches[0].clientY - startY;
       if (dy > 0 && window.scrollY <= 0) {
         indicator.style.transform = `translateY(${Math.min(0, -100 + dy / 1.2)}%)`;
-        if (dy > 90) fired = true;
+        fired = dy > 90;
+      } else {
+        indicator.style.transform = "translateY(-100%)";
+        fired = false;
       }
     };
     const onEnd = () => {
-      pulling = false;
+      const go = pulling && fired;
+      pulling = false; fired = false;
       indicator.style.transform = "translateY(-100%)";
-      if (fired) window.location.reload();
+      if (go && confirmLeaveRef.current()) window.location.reload();
     };
     window.addEventListener("touchstart", onStart, { passive:true });
     window.addEventListener("touchmove", onMove, { passive:true });
     window.addEventListener("touchend", onEnd);
+    window.addEventListener("touchcancel", onEnd);
     return () => {
+      window.removeEventListener("touchcancel", onEnd);
       window.removeEventListener("touchstart", onStart);
       window.removeEventListener("touchmove", onMove);
       window.removeEventListener("touchend", onEnd);
@@ -311,7 +346,10 @@ export default function RoadstarDashboard({ onLogout }) {
   // ── Sidebar content ────────────────────────────────────────────────────────
   function SidebarContent() {
     return (
-      <div style={{ display:"flex", flexDirection:"column", height:"100%", background:T.sideBg || T.cardBg }}>
+      // minHeight (not height) so in a short viewport (phone landscape) the whole
+      // panel scrolls inside its container instead of squeezing the nav list
+      // into a tiny strip between the logo and the footer.
+      <div style={{ display:"flex", flexDirection:"column", minHeight:"100%", background:T.sideBg || T.cardBg }}>
         {/* Logo */}
         <div style={{ padding:"20px 16px 16px", borderBottom:`1px solid ${T.border}`, flexShrink:0 }}>
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
@@ -330,7 +368,7 @@ export default function RoadstarDashboard({ onLogout }) {
         </div>
 
         {/* Nav */}
-        <nav style={{ flex:1, padding:"12px 8px", overflowY:"auto" }}>
+        <nav style={{ flex:1, padding:"12px 8px" }}>
           {nav.map(n => <NavItem key={n.id} {...n}/>)}
         </nav>
 
@@ -349,14 +387,14 @@ export default function RoadstarDashboard({ onLogout }) {
             </div>
           </div>
           {/* Theme */}
-          <button onClick={handleTheme} style={{ display:"flex", alignItems:"center", gap:8, width:"100%", padding:"7px 10px",
+          <button onClick={handleTheme} style={{ display:"flex", alignItems:"center", gap:8, width:"100%", padding:"7px 10px", minHeight:40,
             border:`1px solid ${T.border}`, borderRadius:T.r8, background:"transparent", color:T.textSecond,
             fontSize:12, cursor:"pointer", fontFamily:T.font, marginBottom:4 }}>
             {theme==="dark" ? <SunI s={13} c={T.amber}/> : <MooI s={13} c={T.blue}/>}
             {theme==="dark" ? "Light mode" : "Dark mode"}
           </button>
           {/* Mute alerts */}
-          <button onClick={toggleMute} style={{ display:"flex", alignItems:"center", gap:8, width:"100%", padding:"7px 10px",
+          <button onClick={toggleMute} style={{ display:"flex", alignItems:"center", gap:8, width:"100%", padding:"7px 10px", minHeight:40,
             border:`1px solid ${T.border}`, borderRadius:T.r8, background:"transparent",
             color: soundMuted ? T.textMuted : T.textSecond,
             fontSize:12, cursor:"pointer", fontFamily:T.font, marginBottom:4 }}>
@@ -364,7 +402,7 @@ export default function RoadstarDashboard({ onLogout }) {
             {soundMuted ? "Unmute alerts" : "Mute alerts"}
           </button>
           {/* Logout */}
-          <button onClick={onLogout} style={{ display:"flex", alignItems:"center", gap:8, width:"100%", padding:"7px 10px",
+          <button onClick={() => { if (confirmLeave()) onLogout(); }} style={{ display:"flex", alignItems:"center", gap:8, width:"100%", padding:"7px 10px", minHeight:40,
             border:`1px solid ${T.border}`, borderRadius:T.r8, background:"transparent", color:T.red,
             fontSize:12, cursor:"pointer", fontFamily:T.font }}>
             <OutI s={13} c={T.red}/> Sign out
@@ -376,16 +414,19 @@ export default function RoadstarDashboard({ onLogout }) {
   }
 
   // ── Page map ──────────────────────────────────────────────────────────────
+  // No key={theme}: pages read getT() on every render, so a theme switch just
+  // re-renders them. Remounting used to throw away unsaved Settings edits,
+  // open modals and filters.
   const PAGE_MAP = {
-    today:     <TodayPage     key={theme} onAlert={pushAlert}/>,
-    bookings:  <BookingsPage  key={theme} onAlert={pushAlert}/>,
-    livebay:   <LiveBayPage   key={theme} onAlert={pushAlert}/>,
-    customers: <CustomersPage key={theme} onAlert={pushAlert}/>,
-    analytics: <AnalyticsPage key={theme} onAlert={pushAlert}/>,
-    settings:  <SettingsPage  key={theme} onAlert={pushAlert}/>,
-    audit:     <AuditLogPage  key={theme} onAlert={pushAlert}/>,
-    users:     <UsersPage     key={theme} onAlert={pushAlert}/>,
-    admin:     <AdminPage     key={theme} onAlert={pushAlert}/>,
+    today:     <TodayPage     onAlert={pushAlert}/>,
+    bookings:  <BookingsPage  onAlert={pushAlert}/>,
+    livebay:   <LiveBayPage   onAlert={pushAlert}/>,
+    customers: <CustomersPage onAlert={pushAlert}/>,
+    analytics: <AnalyticsPage onAlert={pushAlert}/>,
+    settings:  <SettingsPage  onAlert={pushAlert} onDirtyChange={d => { settingsDirty.current = d; }}/>,
+    audit:     <AuditLogPage  onAlert={pushAlert}/>,
+    users:     <UsersPage     onAlert={pushAlert}/>,
+    admin:     <AdminPage     onAlert={pushAlert}/>,
   };
 
   const currentLabel = nav.find(n => n.id === page)?.label || "Dashboard";
@@ -394,7 +435,7 @@ export default function RoadstarDashboard({ onLogout }) {
     <div style={{ display:"flex", minHeight:"100vh", background:T.pageBg, fontFamily:T.font, overflowX:"hidden", position:"relative" }}>
 
       {/* ── Desktop sidebar — fixed so it never scrolls with the page ── */}
-      <div style={{ width:SIDEBAR_W, height:"100vh", position:"fixed", left:0, top:0, overflowY:"auto", borderRight:`1px solid ${T.border}`, background:T.sideBg || T.cardBg, zIndex:50 }}
+      <div style={{ width:SIDEBAR_W, height:"100vh", position:"fixed", left:0, top:0, overflowY:"auto", overscrollBehavior:"contain", borderRight:`1px solid ${T.border}`, background:T.sideBg || T.cardBg, zIndex:50 }}
         className="rs-sidebar-desk">
         <SidebarContent/>
       </div>
@@ -405,7 +446,7 @@ export default function RoadstarDashboard({ onLogout }) {
           style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.75)", zIndex:2000, display:"none" }}
           className="rs-drawer-overlay">
           <div onClick={e => e.stopPropagation()}
-            style={{ width:280, height:"100%", background:T.cardBg, borderRight:`1px solid ${T.border}` }}>
+            style={{ width:280, maxWidth:"85vw", height:"100%", overflowY:"auto", overscrollBehavior:"contain", WebkitOverflowScrolling:"touch", background:T.cardBg, borderRight:`1px solid ${T.border}` }}>
             <SidebarContent/>
           </div>
         </div>

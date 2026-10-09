@@ -1,7 +1,7 @@
 // pages/BookingsPage.jsx
 import { useState, useEffect, useCallback } from "react";
 import { fetchBookings, fetchRecentlyDeleted, updateBooking, deleteBooking, restoreBooking, sendSMS, updatePayment, getUserRole } from "../api.js";
-import { getT, sm, displaySvc, effectiveOcc, fmtDate, todayStr, formatTireSize, money } from "../theme.js";
+import { getT, getTheme, sm, displaySvc, effectiveOcc, fmtDate, todayStr, formatTireSize, money } from "../theme.js";
 import { Badge, Btn, IBtn, Modal, ModalTitle, Inp, Sel, PageHeader, Spinner, Empty, Card, CompleteOrderModal, SearchIcon, RefreshIcon, CheckIcon, XIcon, FlagIcon, MsgIcon, TrashIcon, PenIcon, NoteIcon, RestoreIcon, PlusIcon, DownloadIcon, ClipboardCheckIcon } from "../components.jsx";
 import InspectionModal from "../InspectionReport.jsx";
 
@@ -27,9 +27,32 @@ const TIME_SLOTS = (() => {
   return s;
 })();
 
+// "10:30 AM" -> minutes since midnight, so bookings sort by real time (not as text).
+// Unparseable times sort last.
+function timeToMinutes(t) {
+  const m = /^\s*(\d{1,2}):(\d{2})\s*([AaPp][Mm])?\s*$/.exec(t || "");
+  if (!m) return 24 * 60;
+  let h = parseInt(m[1], 10) % 12;
+  if (m[3] && m[3].toUpperCase() === "PM") h += 12;
+  if (!m[3]) h = parseInt(m[1], 10); // 24h fallback
+  return h * 60 + parseInt(m[2], 10);
+}
+const byDateTime = (a, b) => (a.date || "").localeCompare(b.date || "") || timeToMinutes(a.time) - timeToMinutes(b.time);
+
+// Statuses that are final — they leave the Live Queue and live in the "Cancelled / No-show" tab.
+const CLOSED = ["cancelled","no_show"];
+
+// Readable error text. Validation (422) responses carry only errors[] with no top-level
+// message, so the thrown text is just "API error 422" — explain it instead.
+const errText = (e) => /^API error 422$/.test(e?.message || "")
+  ? "Some details are invalid — check the phone, email, price and tire quantity, then try again."
+  : (e?.message || "Something went wrong");
+
 function BookingRow({ b, onUpdate, onDelete, onSMS, onEdit, onPayment, onAlert, onCancel, onConfirm, onInspect, readOnly }) {
   const T = getT(); const s = sm(b.status); const [busy, setBusy] = useState(false);
-  const act = async (updates) => { setBusy(true); try { await onUpdate(b.id, updates); } catch (e) { onAlert?.(e.message,"error"); } finally { setBusy(false); } };
+  const act = async (updates) => { setBusy(true); try { await onUpdate(b.id, updates); } catch (e) { onAlert?.(errText(e),"error"); } finally { setBusy(false); } };
+  // Confirming texts the customer "CONFIRMED" — never offer it for an appointment that's already past
+  const isPast = (b.date || "") < todayStr();
   return (
     <div style={{ background:T.cardBg, borderLeft:`3px solid ${s.color}`, border:`1px solid ${T.border}`, borderRadius:T.r10, padding:"12px 16px", display:"flex", flexWrap:"wrap", alignItems:"center", gap:10, opacity:busy?0.6:1 }}>
       <div style={{ flexShrink:0, textAlign:"center", minWidth:58, padding:"6px 8px", background:T.elevated, borderRadius:T.r8, border:`1px solid ${T.border}` }}>
@@ -50,10 +73,10 @@ function BookingRow({ b, onUpdate, onDelete, onSMS, onEdit, onPayment, onAlert, 
       </div>
       {/* Mechanics see bookings read-only — no action buttons */}
       {!readOnly && (
-        <div style={{ display:"flex", gap:3, flexShrink:0 }}>
-          {!["completed","cancelled"].includes(b.status) && b.status !== "confirmed" && <IBtn v="accept" title="Confirm" onClick={() => onConfirm && onConfirm(b)} disabled={busy}><CheckIcon size={14}/></IBtn>}
-          {!["completed","cancelled"].includes(b.status) && <IBtn v="complete" title="Mark Complete" onClick={() => onEdit(b,"complete")} disabled={busy}><FlagIcon size={14}/></IBtn>}
-          {!["cancelled","completed"].includes(b.status) && <IBtn v="decline" title="Cancel" onClick={() => onCancel && onCancel(b)} disabled={busy}><XIcon size={14}/></IBtn>}
+        <div style={{ display:"flex", flexWrap:"wrap", gap:3, flexShrink:0, maxWidth:"100%" }}>
+          {!["completed",...CLOSED].includes(b.status) && b.status !== "confirmed" && !isPast && <IBtn v="accept" title="Confirm" onClick={() => onConfirm && onConfirm(b)} disabled={busy}><CheckIcon size={14}/></IBtn>}
+          {!["completed",...CLOSED].includes(b.status) && <IBtn v="complete" title="Mark Complete" onClick={() => onEdit(b,"complete")} disabled={busy}><FlagIcon size={14}/></IBtn>}
+          {!["completed",...CLOSED].includes(b.status) && <IBtn v="decline" title="Cancel" onClick={() => onCancel && onCancel(b)} disabled={busy}><XIcon size={14}/></IBtn>}
           <IBtn v="sms"   title="Send SMS" onClick={() => onSMS(b)}    disabled={busy}><MsgIcon size={14}/></IBtn>
           <IBtn v={b.inspection ? "complete" : "edit"} title={b.inspection ? "Inspection Report (saved)" : "Inspection Report"} onClick={() => onInspect(b)} disabled={busy}><ClipboardCheckIcon size={14}/></IBtn>
           <IBtn v="edit"  title="Edit"     onClick={() => onEdit(b)}     disabled={busy}><PenIcon size={14}/></IBtn>
@@ -71,7 +94,7 @@ export default function BookingsPage({ onAlert }) {
   const [bookings,   setBookings]  = useState([]);
   const [deleted,    setDeleted]   = useState([]);
   const [loading,    setLoading]   = useState(true);
-  const [tab,        setTab]       = useState("active"); // active | completed | deleted
+  const [tab,        setTab]       = useState("active"); // active | completed | cancelled | deleted
   const [status,     setStatus]    = useState("all");
   const [search,     setSearch]    = useState("");
   const [dateFilter, setDateFilter]= useState("");
@@ -105,21 +128,41 @@ export default function BookingsPage({ onAlert }) {
     load();
   };
   const handleRestore = async (id) => {
-    await restoreBooking(id);
-    onAlert?.("Booking restored");
-    load();
+    try { await restoreBooking(id); onAlert?.("Booking restored"); load(); }
+    catch (e) { onAlert?.(errText(e), "error"); }
   };
 
   let filtered = bookings;
   if (search) {
-    const q = search.toLowerCase();
-    filtered = filtered.filter(b => `${b.firstName} ${b.lastName}`.toLowerCase().includes(q) || b.phone.includes(q) || (b.email||"").toLowerCase().includes(q));
+    const q = search.toLowerCase().trim();
+    // Phones are stored in many formats (416-555-0141, (416) 555-0141, 416.555.0141) — compare digits only
+    const qDigits = q.replace(/\D/g, "");
+    filtered = filtered.filter(b => `${b.firstName} ${b.lastName}`.toLowerCase().includes(q)
+      || (qDigits.length >= 3 && (b.phone||"").replace(/\D/g, "").includes(qDigits))
+      || (b.phone||"").toLowerCase().includes(q)
+      || (b.email||"").toLowerCase().includes(q));
   }
-  const active    = filtered.filter(b => !["completed","cancelled"].includes(b.status));
+  // Live Queue: open bookings only, today/upcoming first in time order, then overdue ones (most recent first)
+  const today     = todayStr();
+  const open      = filtered.filter(b => !["completed",...CLOSED].includes(b.status));
+  const active    = [
+    ...open.filter(b => (b.date || "") >= today).sort(byDateTime),
+    ...open.filter(b => (b.date || "") <  today).sort((a, b) => byDateTime(b, a)),
+  ];
+  // Cancelled / No-show: newest appointment first, so staff can review, restore or rebook
+  const cancelled = filtered.filter(b => CLOSED.includes(b.status)).sort((a, b) => byDateTime(b, a));
   // Completed: most recently completed at the top
   const completed = filtered.filter(b => b.status === "completed")
     .sort((a, b) => new Date(b.completedAt || `${b.date}T00:00:00`) - new Date(a.completedAt || `${a.date}T00:00:00`));
-  const shown     = tab === "active" ? active : tab === "completed" ? completed : deleted;
+  const shown     = tab === "active" ? active : tab === "completed" ? completed : tab === "cancelled" ? cancelled : deleted;
+  // Picking a status in the filter jumps to the tab that actually lists it
+  const pickStatus = (v) => {
+    setStatus(v);
+    if (v === "completed") setTab("completed");
+    else if (CLOSED.includes(v)) setTab("cancelled");
+    else if (v !== "all" && tab !== "deleted") setTab("active");
+  };
+  const dateScheme = getTheme() === "light" ? "light" : "dark";
 
   return (
     <div>
@@ -140,8 +183,8 @@ export default function BookingsPage({ onAlert }) {
               style={{ width:"100%", background:T.pageBg, border:`1px solid ${T.border}`, borderRadius:T.r8, padding:"8px 12px 8px 32px", color:T.textPrimary, fontSize:13, fontFamily:T.font, outline:"none", boxSizing:"border-box" }}/>
           </div>
           <input type="date" value={dateFilter} onChange={e=>setDateFilter(e.target.value)}
-            style={{ background:T.pageBg, border:`1px solid ${T.border}`, borderRadius:T.r8, padding:"8px 12px", color:T.textPrimary, fontSize:13, fontFamily:T.font, outline:"none", colorScheme:"dark" }}/>
-          <select value={status} onChange={e=>setStatus(e.target.value)}
+            style={{ background:T.pageBg, border:`1px solid ${T.border}`, borderRadius:T.r8, padding:"8px 12px", color:T.textPrimary, fontSize:13, fontFamily:T.font, outline:"none", colorScheme:dateScheme }}/>
+          <select value={status} onChange={e=>pickStatus(e.target.value)}
             style={{ background:T.pageBg, border:`1px solid ${T.border}`, borderRadius:T.r8, padding:"8px 12px", color:T.textPrimary, fontSize:13, fontFamily:T.font, outline:"none" }}>
             {STATUSES.map(s => <option key={s} value={s} style={{background:T.cardBg}}>{s === "all" ? "All statuses" : s.charAt(0).toUpperCase()+s.slice(1).replace("_"," ")}</option>)}
           </select>
@@ -150,8 +193,8 @@ export default function BookingsPage({ onAlert }) {
       </Card>
 
       {/* Tabs — mechanics only see active/completed, not deleted */}
-      <div style={{ display:"flex", gap:2, background:T.cardBg, border:`1px solid ${T.border}`, borderRadius:T.r10, padding:4, marginBottom:16, width:"fit-content" }}>
-        {[["active","Live Queue",active.length],["completed","Completed",completed.length],...(isMechanic?[]:[ ["deleted","Recently Deleted",deleted.length] ])].map(([id,label,count]) => (
+      <div style={{ display:"flex", gap:2, background:T.cardBg, border:`1px solid ${T.border}`, borderRadius:T.r10, padding:4, marginBottom:16, width:"fit-content", maxWidth:"100%", flexWrap:"wrap", boxSizing:"border-box" }}>
+        {[["active","Live Queue",active.length],["completed","Completed",completed.length],["cancelled","Cancelled / No-show",cancelled.length],...(isMechanic?[]:[ ["deleted","Recently Deleted",deleted.length] ])].map(([id,label,count]) => (
           <button key={id} onClick={()=>setTab(id)}
             style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 14px", borderRadius:T.r8, border:"none", background:tab===id?T.elevated:"transparent", color:tab===id?T.textPrimary:T.textMuted, fontSize:13, fontWeight:tab===id?600:400, fontFamily:T.font, cursor:"pointer", whiteSpace:"nowrap" }}>
             {label}
@@ -201,19 +244,35 @@ export default function BookingsPage({ onAlert }) {
       {editB && editMode === "edit" && (
         <EditModal booking={editB} onClose={() => setEditB(null)}
           onSave={async (id, u) => {
+            const orig = editB;
             const { price, paymentMethod, tireQuantity, ...fields } = u;
-            const bookingFields = { ...fields };
-            bookingFields.tireQuantity = tireQuantity === "" || tireQuantity == null ? null : parseInt(tireQuantity, 10);
-            await handleUpdate(id, bookingFields);
-            // Price/method live on the payment endpoint — save them if provided.
-            if ((price !== "" && price != null) || paymentMethod) {
+            const priceNum = price === "" || price == null ? null : parseFloat(price);
+            if (priceNum != null && (isNaN(priceNum) || priceNum < 0)) { onAlert?.("Price must be 0 or more.", "error"); return; }
+            const qty = tireQuantity === "" || tireQuantity == null ? null : parseInt(tireQuantity, 10);
+            if (qty != null && (isNaN(qty) || qty < 1 || qty > 50)) { onAlert?.("Tire quantity must be between 1 and 50.", "error"); return; }
+            // Send only what was actually changed: re-sending an unchanged status re-texts the
+            // customer, an unchanged date/time re-runs the capacity check, and an unchanged
+            // legacy-format phone (e.g. 416.555.0102) can fail validation.
+            const bookingFields = {};
+            for (const [k, v] of Object.entries(fields)) {
+              if ((v ?? "") !== (orig[k] ?? "")) bookingFields[k] = v;
+            }
+            if (qty !== (orig.tireQuantity ?? null)) bookingFields.tireQuantity = qty;
+            // Keep the modal open and say why if the save is rejected (e.g. slot full)
+            if (Object.keys(bookingFields).length) {
+              try { await handleUpdate(id, bookingFields); }
+              catch (e) { onAlert?.(errText(e), "error"); return; }
+            }
+            // Price/method live on the payment endpoint — save them if changed.
+            const payUpd = {};
+            if (priceNum != null && priceNum !== orig.finalPrice) payUpd.finalPrice = priceNum;
+            if (paymentMethod && paymentMethod !== orig.paymentMethod) payUpd.paymentMethod = paymentMethod;
+            if (Object.keys(payUpd).length) {
               try {
-                const payUpd = {};
-                if (price !== "" && price != null) payUpd.finalPrice = parseFloat(price);
-                if (paymentMethod) payUpd.paymentMethod = paymentMethod;
                 const updated = await updatePayment(id, payUpd);
                 setBookings(p => p.map(x => x.id === id ? updated : x));
-              } catch (e) { onAlert?.("Saved, but price didn't update: " + e.message, "error"); }
+                if (!Object.keys(bookingFields).length) onAlert?.("Updated");
+              } catch (e) { onAlert?.("Saved, but price didn't update: " + errText(e), "error"); }
             }
             setEditB(null);
           }}/>
@@ -227,14 +286,14 @@ export default function BookingsPage({ onAlert }) {
               await updatePayment(id, { finalPrice, paymentMethod, paymentStatus });
               await handleUpdate(id, { status:"completed", completedSmsVariant, sendSMS: completedSmsVariant !== "none" });
               setEditB(null);
-            } catch (e) { onAlert?.(e.message, "error"); }
+            } catch (e) { onAlert?.(errText(e), "error"); }
           }}/>
       )}
 
 
       {/* Payment modal */}
       {editB && editMode === "payment" && (
-        <PaymentModal booking={editB} onClose={() => setEditB(null)}
+        <PaymentModal booking={editB} onClose={() => setEditB(null)} onAlert={onAlert}
           onSave={async (id, u) => {
             try {
               const updated = await updatePayment(id, u);
@@ -242,7 +301,7 @@ export default function BookingsPage({ onAlert }) {
               onAlert?.("Payment saved");
               setEditB(null);
             }
-            catch (e) { onAlert?.(e.message, "error"); }
+            catch (e) { onAlert?.(errText(e), "error"); }
           }}/>
       )}
 
@@ -258,7 +317,8 @@ export default function BookingsPage({ onAlert }) {
               <Btn
                 variant={confirmAct.type==="cancel"?"danger":"success"}
                 onClick={async()=>{
-                  await handleUpdate(confirmAct.id,{status:confirmAct.type==="cancel"?"cancelled":"confirmed"});
+                  try { await handleUpdate(confirmAct.id,{status:confirmAct.type==="cancel"?"cancelled":"confirmed"}); }
+                  catch (e) { onAlert?.(errText(e), "error"); }
                   setConfirmAct(null);
                 }}>
                 {confirmAct.type==="cancel" ? "Yes, cancel" : "Yes, confirm"}
@@ -281,7 +341,7 @@ export default function BookingsPage({ onAlert }) {
               This booking will be moved to Recently Deleted<br/>and can be restored within 30 days.
             </div>
             <div style={{display:"flex",gap:10,justifyContent:"center"}}>
-              <Btn variant="danger" onClick={async()=>{await handleDelete(deleteId);setDeleteId(null);}} icon={<TrashIcon size={13} color={T.red}/>}>Yes, delete</Btn>
+              <Btn variant="danger" onClick={async()=>{try{await handleDelete(deleteId);}catch(e){onAlert?.(errText(e),"error");}setDeleteId(null);}} icon={<TrashIcon size={13} color={T.red}/>}>Yes, delete</Btn>
               <Btn variant="ghost" onClick={()=>setDeleteId(null)}>Keep it</Btn>
             </div>
           </div>
@@ -291,7 +351,7 @@ export default function BookingsPage({ onAlert }) {
       {/* SMS modal */}
       {smsB && (
         <SMSModal booking={smsB} onClose={() => setSmsB(null)}
-          onSend={async (b, t) => { try { await sendSMS(b.id, t); onAlert?.("SMS sent"); } catch (e) { onAlert?.(e.message,"error"); } setSmsB(null); }}/>
+          onSend={async (b, t) => { try { await sendSMS(b.id, t); onAlert?.("SMS sent"); } catch (e) { onAlert?.(errText(e),"error"); } setSmsB(null); }}/>
       )}
     </div>
   );
@@ -321,7 +381,7 @@ function EditModal({ booking: b, onClose, onSave }) {
           <div><Lbl>Email</Lbl><Inp type="email" value={form.email} onChange={e=>set("email",e.target.value)} placeholder="optional"/></div>
         </div>
         <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr", gap:10 }}>
-          <div><Lbl>Tire size</Lbl><Inp value={form.tireSize} onChange={e=>set("tireSize",formatTireSize(e.target.value))} placeholder="225/65R17" style={{ fontSize:16, fontWeight:600, letterSpacing:"0.02em" }}/></div>
+          <div><Lbl>Tire size</Lbl><Inp value={form.tireSize} onChange={e=>set("tireSize",formatTireSize(e.target.value, e.target.selectionStart === e.target.value.length))} placeholder="225/65R17" style={{ fontSize:16, fontWeight:600, letterSpacing:"0.02em" }}/></div>
           <div><Lbl>How many tires</Lbl><Inp type="number" value={form.tireQuantity} onChange={e=>set("tireQuantity",e.target.value)} placeholder="e.g. 4"/></div>
         </div>
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
@@ -331,12 +391,13 @@ function EditModal({ booking: b, onClose, onSave }) {
               options={[{value:"",label:"—"},{value:"cash",label:"Cash"},{value:"card",label:"Card"},{value:"cheque",label:"Cheque"},{value:"e-transfer",label:"e-Transfer"},{value:"other",label:"Other"}]}/>
           </div>
         </div>
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10 }}>
-          <div><Lbl>Status</Lbl>
+        {/* Status / Date / Time: 3 across on wide modals, stacks on phones so nothing is squeezed */}
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(120px, 1fr))", gap:10 }}>
+          <div style={{ minWidth:0 }}><Lbl>Status</Lbl>
             <Sel value={form.status} onChange={e=>set("status",e.target.value)} options={["pending","confirmed","waitlist","completed","cancelled","no_show"].map(s=>({value:s,label:s}))}/>
           </div>
-          <div><Lbl>Date</Lbl><Inp type="date" value={form.date} onChange={e=>set("date",e.target.value)} style={{ colorScheme:"dark" }}/></div>
-          <div><Lbl>Time</Lbl><Sel value={form.time} onChange={e=>set("time",e.target.value)} options={TIME_SLOTS.map(t=>({value:t,label:t}))}/></div>
+          <div style={{ minWidth:0 }}><Lbl>Date</Lbl><Inp type="date" value={form.date} onChange={e=>set("date",e.target.value)} style={{ colorScheme:getTheme() === "light" ? "light" : "dark", minWidth:0 }}/></div>
+          <div style={{ minWidth:0 }}><Lbl>Time</Lbl><Sel value={form.time} onChange={e=>set("time",e.target.value)} options={TIME_SLOTS.map(t=>({value:t,label:t}))}/></div>
         </div>
         <div><Lbl>Notes</Lbl>
           <textarea value={form.notes} onChange={e=>set("notes",e.target.value)} rows={2}
@@ -372,7 +433,7 @@ function SMSModal({ booking: b, onClose, onSend }) {
   );
 }
 
-function PaymentModal({ booking: b, onClose, onSave }) {
+function PaymentModal({ booking: b, onClose, onSave, onAlert }) {
   const T = getT();
   const [form, setForm] = useState({
     finalPrice:    b.finalPrice    ?? "",
@@ -421,12 +482,19 @@ function PaymentModal({ booking: b, onClose, onSave }) {
         </div>
       </div>
       <div style={{ display:"flex", gap:8, marginTop:16, paddingTop:14, borderTop:`1px solid ${T.border}` }}>
-        <Btn onClick={async()=>{setBusy(true);try{await onSave(b.id,{
-          finalPrice:    form.finalPrice    !== "" ? parseFloat(form.finalPrice)    : null,
-          paymentMethod: form.paymentMethod || null,
-          paymentStatus: form.paymentStatus || null,
-          paymentNotes:  form.paymentNotes,
-        });}finally{setBusy(false);}}} disabled={busy} icon={<CheckIcon size={13} color="#fff"/>}>
+        <Btn onClick={async()=>{
+          const priceNum = form.finalPrice !== "" && form.finalPrice != null ? parseFloat(form.finalPrice) : null;
+          if (priceNum != null && (isNaN(priceNum) || priceNum < 0)) { onAlert?.("Price must be 0 or more.", "error"); return; }
+          setBusy(true);try{
+          // A price without a method is a valid quote/unpaid price. Leave blank fields out
+          // unless they previously had a value — then send null so the value is cleared.
+          const u = { paymentStatus: form.paymentStatus || "unpaid", paymentNotes: form.paymentNotes };
+          if (priceNum != null) u.finalPrice = priceNum;
+          else if (b.finalPrice != null) u.finalPrice = null;
+          if (form.paymentMethod) u.paymentMethod = form.paymentMethod;
+          else if (b.paymentMethod) u.paymentMethod = null;
+          await onSave(b.id, u);
+        }finally{setBusy(false);}}} disabled={busy} icon={<CheckIcon size={13} color="#fff"/>}>
           {busy ? "Saving…" : "Save Payment"}
         </Btn>
         <Btn variant="ghost" onClick={onClose}>Cancel</Btn>

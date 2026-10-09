@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import RoadstarDashboard from "./RoadstarDashboard.jsx";
 import LoginPage from "./LoginPage.jsx";
-import { verifyToken, getToken } from "./api.js";
+import { verifyToken, getToken, isTokenExpired, logout } from "./api.js";
 import { getTheme, DARK, LIGHT } from "./theme.js";
 
 export default function App() {
@@ -17,13 +17,19 @@ export default function App() {
 
     const token = getToken();
     if (!token) { setAuthed(false); return; }
-    verifyToken().then(v => setAuthed(v)).catch(() => setAuthed(false));
+    // Only a real 401 signs the user out. If the server can't answer right now
+    // (429, 5xx, offline) keep them in while the stored token hasn't expired;
+    // a truly expired session is still caught by api.js on the next call.
+    verifyToken()
+      .then(v => setAuthed(v))
+      .catch(() => setAuthed(!isTokenExpired()));
   }, []);
 
   // UX1: listen for the rs:sessionExpired event fired by api.js on TOKEN_EXPIRED
   useEffect(() => {
-    const handler = () => {
-      setExpired(true);
+    const handler = (e) => {
+      // ACCOUNT_INACTIVE → show the API's "account deactivated" message instead
+      setExpired(e?.detail?.code === "ACCOUNT_INACTIVE" ? (e.detail.message || "Your account has been deactivated.") : true);
       setAuthed(false);
     };
     window.addEventListener("rs:sessionExpired", handler);
@@ -31,7 +37,9 @@ export default function App() {
   }, []);
 
   const handleLogin  = () => { setExpired(false); setAuthed(true); };
-  const handleLogout = () => { localStorage.removeItem("roadstar_token"); setAuthed(false); };
+  // Tell the API (audit-logged) before dropping the token. Fire-and-forget so
+  // signing out never waits on, or fails because of, the network.
+  const handleLogout = () => { logout(); localStorage.removeItem("roadstar_token"); setAuthed(false); };
 
   // Checking — spinner
   if (authed === null) {
@@ -53,7 +61,7 @@ export default function App() {
             background:"#1a0606", borderBottom:"1px solid #450a0a",
             padding:"12px 20px", textAlign:"center",
             fontSize:13, color:"#FCA5A5", fontFamily:"'Inter',-apple-system,sans-serif" }}>
-            ⚠️ Your session expired. Please log in again.
+            ⚠️ {typeof expired === "string" ? expired : "Your session expired. Please log in again."}
           </div>
         )}
         <LoginPage onLogin={handleLogin}/>

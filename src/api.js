@@ -11,6 +11,27 @@ function parseToken() {
 export const getShopId   = () => parseToken().shopId || "";
 export const getUserRole = () => parseToken().role   || "";
 export const getUserName = () => parseToken().name   || "";
+export const getUserId   = () => parseToken().userId || "";
+export const getUserEmail= () => parseToken().email  || "";
+// True when the stored JWT's exp claim is in the past (no network needed).
+export const isTokenExpired = () => {
+  const exp = parseToken().exp;
+  return !exp || exp * 1000 <= Date.now();
+};
+
+// Readable message from an API error body. Validation errors (422) come back as
+// { errors:[{ field, message }] } with no top-level message.
+function errMessage(data, status) {
+  if (data?.message) return data.message;
+  const e = Array.isArray(data?.errors) ? data.errors[0] : null;
+  if (e) {
+    const msg = e.message || e.msg;
+    if (msg && msg !== "Invalid value") return msg;
+    if (e.field) return `Please check the ${e.field} field.`;
+    if (msg) return msg;
+  }
+  return `API error ${status}`;
+}
 
 const h = () => {
   const headers = {
@@ -25,17 +46,20 @@ const h = () => {
 
 async function api(path, opts = {}) {
   const res  = await fetch(`${BASE}${path}`, { headers: h(), ...opts });
-  const data = await res.json();
+  // A 429/502 from a proxy may not be JSON — don't turn that into a parse error.
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    // FE5: on TOKEN_EXPIRED specifically, wipe token so the next render forces login
-    if (data.code === "TOKEN_EXPIRED") {
+    // FE5: a 401 (expired or rejected token) means the session is over — wipe the
+    // token so the next render forces login. 403 (no permission), 429 (rate limit)
+    // and 5xx are temporary/other problems and must NOT sign the user out.
+    if (res.status === 401) {
       localStorage.removeItem("roadstar_token");
       // Emit a custom event so App.jsx can show a "session expired" banner
       // rather than silently breaking. Falls back to reload if no listener.
-      const expired = new CustomEvent("rs:sessionExpired");
+      const expired = new CustomEvent("rs:sessionExpired", { detail: { code: data.code, message: data.message } });
       if (!window.dispatchEvent(expired)) window.location.reload();
     }
-    throw new Error(data.message || `API error ${res.status}`);
+    throw new Error(errMessage(data, res.status));
   }
   return data;
 }
@@ -43,7 +67,7 @@ async function api(path, opts = {}) {
 // ── Auth ──────────────────────────────────────────────────────────────────────
 export const login = async (email, password) => {
   const res  = await fetch(`${BASE}/auth/login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password }) });
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.message || "Login failed");
   localStorage.setItem("roadstar_token", data.token);
   return data;
@@ -52,7 +76,7 @@ export const login = async (email, password) => {
 // Email OTP login — Step 1: request a 6-digit code
 export const requestOtp = async (email) => {
   const res  = await fetch(`${BASE}/auth/request-otp`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) });
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.message || "Failed to send code");
   return data;
 };
@@ -60,19 +84,29 @@ export const requestOtp = async (email) => {
 // Email OTP login — Step 2: verify code, get JWT
 export const verifyOtp = async (email, code) => {
   const res  = await fetch(`${BASE}/auth/verify-otp`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, code }) });
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.message || "Invalid code");
   if (data.token) localStorage.setItem("roadstar_token", data.token);
   return data;
 };
 
+// true = valid, false = the server rejected the token (401).
+// Anything else (429 rate limit, 5xx, network down) throws, so the caller
+// doesn't treat a temporary server problem as being signed out.
 export const verifyToken = async () => {
   const res  = await fetch(`${BASE}/auth/verify`, { method: "POST", headers: h() });
-  const data = await res.json();
+  if (res.status === 401) return false;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.message || `API error ${res.status}`);
   return data.success === true;
 };
 export const fetchMe = () => api("/auth/me");
-export const logout  = () => api("/auth/logout", { method: "POST" });
+// Tells the server the user signed out (audit log). Best effort: never throws
+// and never fires the session-expired banner, so sign-out always completes.
+export const logout  = async () => {
+  if (!getToken()) return;
+  try { await fetch(`${BASE}/auth/logout`, { method: "POST", headers: h(), keepalive: true }); } catch {}
+};
 
 // ── Bookings ──────────────────────────────────────────────────────────────────
 export const fetchBookings       = (f = {}) => api(`/bookings?${new URLSearchParams(f)}`).then(d => d.bookings);
@@ -103,7 +137,7 @@ export const exportCustomersCSV   = async () => {
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement("a");
   a.href     = url;
-  a.download = `customers-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.download = `customers-${new Date().toLocaleDateString("en-CA")}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 };

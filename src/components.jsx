@@ -1,5 +1,5 @@
 // components.jsx — shared UI primitives used across all pages
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { getT, sm, displaySvc } from "./theme.js";
 
 // ── Badge ─────────────────────────────────────────────────────────────────────
@@ -46,10 +46,28 @@ export function Btn({ onClick, children, variant = "primary", small = false, dis
     amber:   { bg: h ? T.amberBg : "transparent", bd: T.amberBorder, cl: T.amber },
     teal:    { bg: h ? "#042f2e" : T.tealBg,    bd: T.tealBorder,  cl: T.teal },
   }[variant] || { bg:T.blue, bd:T.blue, cl:"#fff" };
+  // Single-submission guard: when onClick returns a promise (async handler) the
+  // button stays disabled until it settles, so a double/triple click can't fire
+  // the same request several times. The ref blocks clicks that land before the
+  // re-render.
+  const [pending, setPending] = useState(false);
+  const pendingRef = useRef(false);
+  const mounted    = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  const off = disabled || pending;
+  const handleClick = e => {
+    if (off || pendingRef.current || !onClick) return;
+    const r = onClick(e);
+    if (r && typeof r.then === "function") {
+      pendingRef.current = true; setPending(true);
+      const done = () => { pendingRef.current = false; if (mounted.current) setPending(false); };
+      r.then(done, done);
+    }
+  };
   return (
-    <button onClick={onClick} disabled={disabled}
+    <button onClick={handleClick} disabled={off}
       onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
-      style={{ display:"inline-flex", alignItems:"center", gap:6, padding:small?"7px 13px":"10px 18px", borderRadius:T.r8, background:S.bg, border:`1px solid ${S.bd}`, color:S.cl, fontSize:small?12:13, fontWeight:600, fontFamily:T.font, cursor:disabled?"not-allowed":"pointer", opacity:disabled?0.5:1, transition:"all .12s", whiteSpace:"nowrap", ...style }}>
+      style={{ display:"inline-flex", alignItems:"center", gap:6, padding:small?"7px 13px":"10px 18px", minHeight:small?36:40, borderRadius:T.r8, background:S.bg, border:`1px solid ${S.bd}`, color:S.cl, fontSize:small?12:13, fontWeight:600, fontFamily:T.font, cursor:off?"not-allowed":"pointer", opacity:off?0.5:1, transition:"all .12s", whiteSpace:"nowrap", ...style }}>
       {icon}{children}
     </button>
   );
@@ -76,14 +94,38 @@ export function Sel({ value, onChange, options, style = {} }) {
 }
 
 // ── Modal overlay ─────────────────────────────────────────────────────────────
+// Stack of open modals so Escape only closes the top-most one.
+const modalStack = [];
 export function Modal({ children, onClose, wide = false, persistent = false }) {
   const T = getT();
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+  const touchedRef = useRef(false); // set once the user types/changes anything inside
+  useEffect(() => {
+    const token = {};
+    modalStack.push(token);
+    const onKey = e => {
+      if (e.key !== "Escape" || modalStack[modalStack.length - 1] !== token) return;
+      e.stopPropagation();
+      // Persistent modals hold long forms (walk-in, edit, inspection): ask first.
+      if (persistent && touchedRef.current && !window.confirm("Close this form? Anything you typed will be lost.")) return;
+      closeRef.current?.();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      const i = modalStack.indexOf(token);
+      if (i >= 0) modalStack.splice(i, 1);
+    };
+  }, [persistent]);
   return (
-    <div onClick={e => { if (!persistent && e.target === e.currentTarget) onClose(); }}
-      style={{ position:"fixed", inset:0, background:"rgba(2,4,12,.85)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center", padding:16, backdropFilter:"blur(4px)" }}>
-      <div style={{ background:T.panelBg, border:`1px solid ${T.borderVis}`, borderRadius:T.r16, padding:24, maxWidth:wide?720:480, width:"100%", boxShadow:T.shadowLg, maxHeight:"90vh", overflowY:"auto", position:"relative" }}>
-        <button onClick={onClose} style={{ position:"absolute", top:12, right:12, background:T.elevated, border:`1px solid ${T.border}`, borderRadius:T.r8, width:28, height:28, display:"flex", alignItems:"center", justifyContent:"center", color:T.textMuted, cursor:"pointer" }}>
-          <XIcon size={13}/>
+    <div data-rs-modal="" onClick={e => { if (!persistent && e.target === e.currentTarget) onClose(); }}
+      style={{ position:"fixed", inset:0, background:"rgba(2,4,12,.85)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center", padding:16, backdropFilter:"blur(4px)", overscrollBehavior:"contain" }}>
+      {/* overscrollBehavior:contain keeps scrolling inside the modal — reaching the
+          top/bottom never scroll-chains to the page or triggers pull-to-refresh */}
+      <div role="dialog" aria-modal="true" onInput={() => { touchedRef.current = true; }} onChange={() => { touchedRef.current = true; }} style={{ background:T.panelBg, border:`1px solid ${T.borderVis}`, borderRadius:T.r16, padding:24, maxWidth:wide?720:480, width:"100%", boxShadow:T.shadowLg, maxHeight:"90vh", overflowY:"auto", overscrollBehavior:"contain", WebkitOverflowScrolling:"touch", position:"relative" }}>
+        <button onClick={onClose} aria-label="Close" title="Close (Esc)" style={{ position:"absolute", top:8, right:8, background:T.elevated, border:`1px solid ${T.border}`, borderRadius:T.r8, width:40, height:40, display:"flex", alignItems:"center", justifyContent:"center", color:T.textMuted, cursor:"pointer", zIndex:1 }}>
+          <XIcon size={15}/>
         </button>
         {children}
       </div>
@@ -94,7 +136,7 @@ export function Modal({ children, onClose, wide = false, persistent = false }) {
 export function ModalTitle({ children, sub }) {
   const T = getT();
   return (
-    <div style={{ marginBottom:16 }}>
+    <div style={{ marginBottom:16, paddingRight:40 }}>
       <div style={{ fontSize:15, fontWeight:700, color:T.textPrimary }}>{children}</div>
       {sub && <div style={{ fontSize:12, color:T.textMuted, marginTop:2 }}>{sub}</div>}
     </div>
@@ -214,7 +256,9 @@ export function CompleteOrderModal({ booking: b, onClose, onConfirm }) {
   const [form, setForm] = useState({
     finalPrice:    b.finalPrice    ?? "",
     paymentMethod: b.paymentMethod ?? "",
-    paymentStatus: b.paymentStatus ?? "paid",
+    // Completing an order normally means it was paid. Every booking comes back
+    // from the API as "unpaid", so only keep a deliberate partial/refunded state.
+    paymentStatus: ["partial","refunded"].includes(b.paymentStatus) ? b.paymentStatus : "paid",
     smsVariant:    "without_review",
   });
   const [busy, setBusy] = useState(false);
@@ -259,9 +303,14 @@ export function CompleteOrderModal({ booking: b, onClose, onConfirm }) {
             options={[
               {value:"paid",     label:"Paid"},
               {value:"partial",  label:"Partial"},
-              {value:"unpaid",   label:"Unpaid"},
+              {value:"unpaid",   label:"Unpaid — customer still owes"},
               {value:"refunded", label:"Refunded"},
             ]}/>
+          {form.paymentStatus === "unpaid" && (
+            <div style={{ fontSize:11, color:T.amberText, background:T.amberBg, border:`1px solid ${T.amberBorder}`, borderRadius:T.r8, padding:"6px 10px", marginTop:6 }}>
+              This job will be recorded as not paid and left out of revenue until it is marked paid.
+            </div>
+          )}
         </div>
         <div>
           <Lbl>Text the customer?</Lbl>
@@ -276,9 +325,9 @@ export function CompleteOrderModal({ booking: b, onClose, onConfirm }) {
       {!canSubmit && (
         <div style={{ fontSize:11, color:T.textMuted, marginTop:10 }}>Enter a price and payment method to complete.</div>
       )}
-      <div style={{ display:"flex", gap:8, marginTop:16, paddingTop:14, borderTop:`1px solid ${T.border}` }}>
+      <div style={{ display:"flex", gap:8, marginTop:16, paddingTop:14, borderTop:`1px solid ${T.border}`, flexWrap:"wrap" }}>
         <Btn disabled={!canSubmit} icon={<CheckIcon size={13} color="#fff"/>}
-          onClick={async()=>{ setBusy(true); try { await onConfirm(b.id, {
+          onClick={async()=>{ if (busy) return; setBusy(true); try { await onConfirm(b.id, {
             finalPrice:    parseFloat(form.finalPrice),
             paymentMethod: form.paymentMethod,
             paymentStatus: form.paymentStatus,
@@ -301,23 +350,41 @@ export function ConfirmModal({ title, message, confirmLabel = "Yes, proceed", co
   const T = getT();
   const iconBg    = confirmVariant === "danger"  ? T.redBg    : confirmVariant === "amber" ? T.amberBg  : T.greenBg;
   const iconBd    = confirmVariant === "danger"  ? T.redBorder: confirmVariant === "amber" ? T.amberBorder : T.greenBorder;
+  // Own busy state so the confirm button is disabled while onConfirm runs even
+  // when the caller doesn't pass `busy` — one click = one request.
+  const [running, setRunning] = useState(false);
+  const [err,     setErr]     = useState("");
+  const runRef  = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  const working = busy || running;
+  const handleConfirm = async () => {
+    if (working || runRef.current) return;
+    runRef.current = true; setRunning(true); setErr("");
+    try { await onConfirm?.(); }
+    catch (e) { if (mounted.current) setErr(e?.message || "Something went wrong"); }
+    finally { runRef.current = false; if (mounted.current) setRunning(false); }
+  };
   return (
-    <Modal onClose={onCancel}>
+    <Modal onClose={() => { if (!working) onCancel?.(); }}>
       <div style={{ textAlign:"center", padding:"8px 0 16px" }}>
         {icon && (
           <div style={{ width:56, height:56, borderRadius:"50%", background:iconBg, border:`2px solid ${iconBd}`, display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 18px" }}>
             {icon}
           </div>
         )}
-        <div style={{ fontSize:17, fontWeight:700, color:T.textPrimary, marginBottom:8, lineHeight:1.3 }}>{title}</div>
+        <div style={{ fontSize:17, fontWeight:700, color:T.textPrimary, marginBottom:8, lineHeight:1.3, padding:"0 32px" }}>{title}</div>
         {message && (
           <div style={{ fontSize:13, color:T.textMuted, marginBottom:24, lineHeight:1.65, maxWidth:340, margin:"0 auto 24px" }}>{message}</div>
         )}
-        <div style={{ display:"flex", gap:10, justifyContent:"center" }}>
-          <Btn variant={confirmVariant} onClick={onConfirm} disabled={busy}>
-            {busy ? "Working…" : confirmLabel}
+        {err && (
+          <div style={{ fontSize:12, color:T.redText, background:T.redBg, border:`1px solid ${T.redBorder}`, borderRadius:T.r8, padding:"8px 12px", margin:"0 auto 16px", maxWidth:340 }}>{err}</div>
+        )}
+        <div style={{ display:"flex", gap:10, justifyContent:"center", flexWrap:"wrap" }}>
+          <Btn variant={confirmVariant} onClick={handleConfirm} disabled={working}>
+            {working ? "Working…" : confirmLabel}
           </Btn>
-          <Btn variant="ghost" onClick={onCancel} disabled={busy}>Cancel</Btn>
+          <Btn variant="ghost" onClick={onCancel} disabled={working}>Cancel</Btn>
         </div>
       </div>
     </Modal>
