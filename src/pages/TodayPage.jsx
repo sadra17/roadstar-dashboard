@@ -1,8 +1,8 @@
 // pages/TodayPage.jsx — no emoji, SVG icons throughout
 import { useState, useEffect, useCallback } from "react";
 import { fetchBookings, fetchLiveBay, updateBooking, updatePayment, baySnooze, extendBay, bayStart, bayEnd, getUserRole, fetchSettings, updateMechanic } from "../api.js";
-import { getT, sm, displaySvc, effectiveOcc, todayStr, formatTireSize, byTime } from "../theme.js";
-import { Badge, Btn, IBtn, Modal, ModalTitle, Sel, Inp, StatCard, PageHeader, Spinner, CheckIcon, XIcon, FlagIcon, ClockIcon, BayIcon, RefreshIcon, PlusIcon, ConfirmModal, CompleteOrderModal, TrashIcon, WrenchIcon, NoteIcon } from "../components.jsx";
+import { getT, sm, displaySvc, effectiveOcc, todayStr, formatTireSize, byTime, fmtBooked } from "../theme.js";
+import { Badge, Btn, IBtn, Modal, ModalTitle, Sel, Inp, StatCard, PageHeader, Spinner, TicketTag, CheckIcon, XIcon, FlagIcon, ClockIcon, BayIcon, RefreshIcon, PlusIcon, ConfirmModal, CompleteOrderModal, TrashIcon, WrenchIcon, NoteIcon } from "../components.jsx";
 
 // A car is "Live at Bay" once a mechanic presses Start, and "Done" once they
 // press Finished (until the front desk completes it with a price).
@@ -93,7 +93,7 @@ function LiveCard({ b, onFinish, onSnooze, onExtend }) {
         <div style={{ height:"100%", width:`${pct}%`, background:isOver ? T.red : accentColor, borderRadius:2, transition:"width .5s" }}/>
       </div>
 
-      <div style={{ fontSize:14, fontWeight:700, color:T.textPrimary, marginBottom:2, overflowWrap:"anywhere" }}>{b.firstName} {b.lastName}</div>
+      <div style={{ fontSize:14, fontWeight:700, color:T.textPrimary, marginBottom:2, overflowWrap:"anywhere", display:"flex", flexWrap:"wrap", alignItems:"center", gap:6 }}><TicketTag n={b.ticketNumber}/><span style={{ minWidth:0 }}>{b.firstName} {b.lastName}</span></div>
       <div style={{ fontSize:11, fontWeight:600, color:accentColor, textTransform:"uppercase", letterSpacing:"0.04em", marginBottom:8, overflowWrap:"anywhere" }}>{displaySvc(b)}</div>
       {b._elapsedMinutes != null && <div style={{ fontSize:11, color:T.textMuted, marginBottom:8 }}>In shop {b._elapsedMinutes} min</div>}
 
@@ -146,7 +146,7 @@ function BayPill({ kind }) {
   );
 }
 
-function QueueRow({ b, onConfirm, onCancel, onComplete, onStart, onFinish, onNote, readOnly }) {
+function QueueRow({ b, isNext, onConfirm, onCancel, onComplete, onStart, onFinish, onNote, readOnly }) {
   const T = getT();
   const s = sm(b.status);
   const bay = bayState(b);
@@ -168,8 +168,10 @@ function QueueRow({ b, onConfirm, onCancel, onComplete, onStart, onFinish, onNot
         {/* Info */}
         <div style={{ flex:1, minWidth:0 }}>
           <div style={{ fontSize:13, fontWeight:700, color:T.textPrimary, marginBottom:1, display:"flex", flexWrap:"wrap", alignItems:"center", gap:6, overflowWrap:"anywhere" }}>
+            <TicketTag n={b.ticketNumber} big next={isNext}/>
             <span style={{ minWidth:0 }}>{b.firstName} {b.lastName}</span>
             <SourceTag source={b.source}/>
+            {isNext && <span style={{ fontSize:9, fontWeight:800, letterSpacing:"0.06em", textTransform:"uppercase", padding:"2px 7px", borderRadius:20, background:T.green, color:"#fff", whiteSpace:"nowrap" }}>Next up</span>}
           </div>
           <div style={{ fontSize:11, fontWeight:600, color:s.color, textTransform:"uppercase", letterSpacing:"0.04em", marginBottom:(b.tireSize||b.tireQuantity)?3:0, overflowWrap:"anywhere" }}>{displaySvc(b)}</div>
           {(b.tireSize || b.tireQuantity) && (
@@ -178,7 +180,12 @@ function QueueRow({ b, onConfirm, onCancel, onComplete, onStart, onFinish, onNot
               {b.tireSize || "—"}{b.tireQuantity ? ` · ${b.tireQuantity} tires` : ""}
             </div>
           )}
-          {b.phone && <div style={{ fontSize:10, color:T.textMuted, marginTop:1, whiteSpace:"nowrap" }}>{b.phone}</div>}
+          {(b.phone || b.createdAt) && (
+            <div style={{ fontSize:10, color:T.textMuted, marginTop:1, display:"flex", flexWrap:"wrap", columnGap:10 }}>
+              {b.phone && <span style={{ whiteSpace:"nowrap" }}>{b.phone}</span>}
+              {b.createdAt && <span style={{ whiteSpace:"nowrap" }}>Booked {fmtBooked(b.createdAt)}</span>}
+            </div>
+          )}
         </div>
         <div style={{ display:"flex", alignItems:"center", gap:8, flexShrink:0, ...(narrow ? { flexBasis:"100%", flexWrap:"wrap", justifyContent:"space-between", paddingTop:10, borderTop:`1px solid ${T.border}` } : {}) }}>
         {bay ? <BayPill kind={bay}/> : <Badge status={b.status}/>}
@@ -463,6 +470,8 @@ export default function TodayPage({ onAlert }) {
   };
 
   const active    = bookings.filter(b => !["completed","cancelled"].includes(b.status));
+  const queueSorted = [...active].sort(byTime);
+  const nextId      = queueSorted.find(b => !bayState(b) && b.status !== "no_show")?.id;
   const completed = bookings.filter(b => b.status === "completed");
 
   const counts = {
@@ -516,7 +525,8 @@ export default function TodayPage({ onAlert }) {
         </div>
       )}
 
-      {/* Queue */}
+      {/* Queue — same time slot is ordered by ticket number (who booked first).
+          "Next up" = first customer still waiting (not at a bay, not done). */}
       <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:12 }}>
         <span style={{ fontSize:13, fontWeight:700, color:T.textPrimary }}>Today's Queue</span>
         <span style={{ fontSize:11, color:T.textMuted, background:T.elevated, padding:"2px 8px", borderRadius:20, border:`1px solid ${T.border}` }}>
@@ -534,8 +544,8 @@ export default function TodayPage({ onAlert }) {
         </div>
       ) : (
         <div style={{ display:"flex", flexDirection:"column", gap:7 }}>
-          {[...active].sort(byTime).map(b => (
-            <QueueRow key={b.id} b={b}
+          {queueSorted.map(b => (
+            <QueueRow key={b.id} b={b} isNext={b.id === nextId}
               readOnly={isMechanic}
               onNote={isMechanic ? setNoteB : null}
               onStart={handleStart}

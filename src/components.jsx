@@ -13,6 +13,21 @@ export function Badge({ status }) {
   );
 }
 
+// ── Ticket number ─────────────────────────────────────────────────────────────
+// Daily ticket (100, 101, 102 ...) handed out by the database in the order
+// bookings were made. Renders nothing until the booking has one.
+export function TicketTag({ n, big = false, next = false }) {
+  const T = getT();
+  if (n == null) return null;
+  const c = next ? T.green : T.textPrimary;
+  return (
+    <span title={`Ticket #${n}`} style={{ display:"inline-flex", alignItems:"center", gap:4, fontSize:big ? 13 : 11, fontWeight:800, fontVariantNumeric:"tabular-nums", letterSpacing:"0.02em", padding:big ? "3px 9px" : "2px 7px", borderRadius:6, background:next ? `${T.green}18` : T.elevated, color:c, border:`1px solid ${next ? `${T.green}66` : T.border}`, whiteSpace:"nowrap", lineHeight:1.2 }}>
+      <svg width={big ? 12 : 10} height={big ? 12 : 10} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v3a2 2 0 0 0 0 4v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-3a2 2 0 0 0 0-4z"/><path d="M14 5v14" strokeDasharray="2 2.5"/></svg>
+      #{n}
+    </span>
+  );
+}
+
 // ── Icon button ───────────────────────────────────────────────────────────────
 export function IBtn({ onClick, title, children, v = "def", disabled = false }) {
   const T = getT(); const [h, setH] = useState(false);

@@ -179,7 +179,19 @@ export function timeToMinutes(t) {
   if (period === "AM" && h === 12) h = 0;
   return h * 60 + Number(m[2]);
 }
-export const byTime = (a, b) => timeToMinutes(a.time) - timeToMinutes(b.time);
+// When the customer's booking was made, e.g. "Nov 7, 11:52 AM" (shop time).
+export const fmtBooked = (iso) => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d)) return "";
+  return d.toLocaleString("en-US", { timeZone:"America/Toronto", month:"short", day:"numeric", hour:"numeric", minute:"2-digit" });
+};
+
+// Same time slot → lower ticket number first (who booked first), then creation time.
+export const byTime = (a, b) =>
+  (timeToMinutes(a.time) - timeToMinutes(b.time)) ||
+  ((a.ticketNumber ?? Infinity) - (b.ticketNumber ?? Infinity)) ||
+  String(a.createdAt || "").localeCompare(String(b.createdAt || ""));
 
 // Auto-format a tire size as the user types: inserts the "/" and "R" so that
 // e.g. "2256517" becomes "225/65R17". Letters are upper-cased. Anything that

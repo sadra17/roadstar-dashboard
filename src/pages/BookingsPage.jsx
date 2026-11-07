@@ -1,8 +1,8 @@
 // pages/BookingsPage.jsx
 import { useState, useEffect, useCallback } from "react";
 import { fetchBookings, fetchRecentlyDeleted, updateBooking, deleteBooking, restoreBooking, sendSMS, updatePayment, getUserRole } from "../api.js";
-import { getT, getTheme, sm, displaySvc, effectiveOcc, fmtDate, todayStr, formatTireSize, money } from "../theme.js";
-import { Badge, Btn, IBtn, Modal, ModalTitle, Inp, Sel, PageHeader, Spinner, Empty, Card, CompleteOrderModal, SearchIcon, RefreshIcon, CheckIcon, XIcon, FlagIcon, MsgIcon, TrashIcon, PenIcon, NoteIcon, RestoreIcon, PlusIcon, DownloadIcon, ClipboardCheckIcon } from "../components.jsx";
+import { getT, getTheme, sm, displaySvc, effectiveOcc, fmtDate, todayStr, formatTireSize, money, fmtBooked } from "../theme.js";
+import { Badge, TicketTag, Btn, IBtn, Modal, ModalTitle, Inp, Sel, PageHeader, Spinner, Empty, Card, CompleteOrderModal, SearchIcon, RefreshIcon, CheckIcon, XIcon, FlagIcon, MsgIcon, TrashIcon, PenIcon, NoteIcon, RestoreIcon, PlusIcon, DownloadIcon, ClipboardCheckIcon } from "../components.jsx";
 import InspectionModal from "../InspectionReport.jsx";
 
 
@@ -37,7 +37,8 @@ function timeToMinutes(t) {
   if (!m[3]) h = parseInt(m[1], 10); // 24h fallback
   return h * 60 + parseInt(m[2], 10);
 }
-const byDateTime = (a, b) => (a.date || "").localeCompare(b.date || "") || timeToMinutes(a.time) - timeToMinutes(b.time);
+const byDateTime = (a, b) => (a.date || "").localeCompare(b.date || "") || timeToMinutes(a.time) - timeToMinutes(b.time)
+  || ((a.ticketNumber ?? Infinity) - (b.ticketNumber ?? Infinity));
 
 // Statuses that are final — they leave the Live Queue and live in the "Cancelled / No-show" tab.
 const CLOSED = ["cancelled","no_show"];
@@ -60,8 +61,8 @@ function BookingRow({ b, onUpdate, onDelete, onSMS, onEdit, onPayment, onAlert, 
         <div style={{ fontSize:10, color:T.textMuted, marginTop:1 }}>{b.date}</div>
       </div>
       <div style={{ flex:"1 1 min(240px, calc(100% - 90px))", minWidth:150, overflowWrap:"anywhere" }}>
-        <div style={{ fontSize:13, fontWeight:700, color:T.textPrimary }}>{b.firstName} {b.lastName}</div>
-        <div style={{ fontSize:11, color:T.textMuted, display:"flex", flexWrap:"wrap", columnGap:8 }}><span style={{ whiteSpace:"nowrap" }}>{b.phone}</span>{b.email && <span style={{ minWidth:0 }}>{b.email}</span>}</div>
+        <div style={{ fontSize:13, fontWeight:700, color:T.textPrimary, display:"flex", flexWrap:"wrap", alignItems:"center", gap:6 }}><TicketTag n={b.ticketNumber}/><span style={{ minWidth:0 }}>{b.firstName} {b.lastName}</span></div>
+        <div style={{ fontSize:11, color:T.textMuted, display:"flex", flexWrap:"wrap", columnGap:8 }}><span style={{ whiteSpace:"nowrap" }}>{b.phone}</span>{b.email && <span style={{ minWidth:0 }}>{b.email}</span>}{b.createdAt && <span style={{ whiteSpace:"nowrap" }}>Booked {fmtBooked(b.createdAt)}</span>}</div>
         <div style={{ fontSize:11, fontWeight:600, color:s.color, textTransform:"uppercase", letterSpacing:"0.04em", marginTop:2 }}>{displaySvc(b)}</div>
         {b.tireSize && <div style={{ fontSize:10, color:T.orange, marginTop:1 }}>{b.tireSize}</div>}
         {b.mechanicNotes && <div style={{ fontSize:11, color:T.textMuted, marginTop:3, display:"flex", alignItems:"flex-start", gap:4 }}><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0,marginTop:1}}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>{b.mechanicNotes}</div>}

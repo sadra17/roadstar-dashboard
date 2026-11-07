@@ -5,7 +5,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { fetchLiveBay, baySnooze, extendBay, updateMechanic, bayStart, bayEnd, getToken, getUserRole } from "../api.js";
 import { getT, displaySvc, effectiveOcc, byTime } from "../theme.js";
-import { Badge, Btn, IBtn, Modal, ModalTitle, PageHeader, Spinner, Empty, Card, RefreshIcon, BayIcon, FlagIcon, ClockIcon, CheckIcon, PlusIcon, WrenchIcon, NoteIcon } from "../components.jsx";
+import { Badge, TicketTag, Btn, IBtn, Modal, ModalTitle, PageHeader, Spinner, Empty, Card, RefreshIcon, BayIcon, FlagIcon, ClockIcon, CheckIcon, PlusIcon, WrenchIcon, NoteIcon } from "../components.jsx";
 
 export default function LiveBayPage({ onAlert }) {
   const T = getT();
@@ -104,7 +104,7 @@ export default function LiveBayPage({ onAlert }) {
                       <span style={{ fontSize:11, fontWeight:700, letterSpacing:"0.06em", textTransform:"uppercase", color:T.textMuted }}>Scheduled {b.time}</span>
                       <Badge status={b.status}/>
                     </div>
-                    <div style={{ fontSize:16, fontWeight:700, color:T.textPrimary, marginBottom:2, overflowWrap:"anywhere" }}>{b.firstName} {b.lastName}</div>
+                    <div style={{ fontSize:16, fontWeight:700, color:T.textPrimary, marginBottom:2, overflowWrap:"anywhere", display:"flex", flexWrap:"wrap", alignItems:"center", gap:6 }}><TicketTag n={b.ticketNumber} big/><span style={{ minWidth:0 }}>{b.firstName} {b.lastName}</span></div>
                     <div style={{ fontSize:12, fontWeight:600, color:T.blue, marginBottom:6, textTransform:"uppercase", letterSpacing:"0.04em" }}>{displaySvc(b)}</div>
                     {CustomerInfo(b)}
                     <Btn variant="primary" small style={{ width:"100%", justifyContent:"center", marginTop:4 }} icon={<PlusIcon size={13} color="#fff"/>} disabled={busy[b.id]} onClick={() => handleStart(b)}>
@@ -148,7 +148,7 @@ export default function LiveBayPage({ onAlert }) {
                       </div>
 
                       {/* Customer info */}
-                      <div style={{ fontSize:16, fontWeight:700, color:T.textPrimary, marginBottom:2, overflowWrap:"anywhere" }}>{b.firstName} {b.lastName}</div>
+                      <div style={{ fontSize:16, fontWeight:700, color:T.textPrimary, marginBottom:2, overflowWrap:"anywhere", display:"flex", flexWrap:"wrap", alignItems:"center", gap:6 }}><TicketTag n={b.ticketNumber} big/><span style={{ minWidth:0 }}>{b.firstName} {b.lastName}</span></div>
                       <div style={{ fontSize:12, fontWeight:600, color, marginBottom:4, textTransform:"uppercase", letterSpacing:"0.04em", overflowWrap:"anywhere" }}>{displaySvc(b)}</div>
                       <div style={{ fontSize:11, color:T.textMuted, marginBottom:8 }}>In shop {b._elapsedMinutes ?? 0} min · {effectiveOcc(b)} min expected{b._extendedBy > 0 ? ` (+${b._extendedBy})` : ""}</div>
                       {CustomerInfo(b)}
@@ -187,7 +187,7 @@ export default function LiveBayPage({ onAlert }) {
                     {/* Info + badge wrap together so the badge drops under the name on phones instead of overflowing the row */}
                     <div style={{ flex:1, minWidth:0, display:"flex", flexWrap:"wrap", alignItems:"center", gap:"6px 12px" }}>
                       <div style={{ flex:"1 1 160px", minWidth:0, overflowWrap:"anywhere" }}>
-                        <div style={{ fontSize:13, fontWeight:600, color:T.textPrimary }}>{b.firstName} {b.lastName}</div>
+                        <div style={{ fontSize:13, fontWeight:600, color:T.textPrimary, display:"flex", flexWrap:"wrap", alignItems:"center", gap:6 }}><TicketTag n={b.ticketNumber}/><span style={{ minWidth:0 }}>{b.firstName} {b.lastName}</span></div>
                         <div style={{ fontSize:11, color:T.textMuted }}>{displaySvc(b)} · {effectiveOcc(b)} min</div>
                       </div>
                       <span style={{ flexShrink:0, display:"flex" }}><Badge status={b.status}/></span>
