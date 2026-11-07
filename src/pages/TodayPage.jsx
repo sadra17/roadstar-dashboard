@@ -1,8 +1,9 @@
 // pages/TodayPage.jsx — no emoji, SVG icons throughout
 import { useState, useEffect, useCallback } from "react";
 import { fetchBookings, fetchLiveBay, updateBooking, updatePayment, baySnooze, extendBay, bayStart, bayEnd, getUserRole, fetchSettings, updateMechanic } from "../api.js";
+import { CAR_OPTIONS, CAR_COLORS, colorHex, searchOptions } from "../vehicles.js";
 import { getT, sm, displaySvc, effectiveOcc, todayStr, formatTireSize, byTime, fmtBooked } from "../theme.js";
-import { Badge, Btn, IBtn, Modal, ModalTitle, Sel, Inp, StatCard, PageHeader, Spinner, TicketTag, CheckIcon, XIcon, FlagIcon, ClockIcon, BayIcon, RefreshIcon, PlusIcon, ConfirmModal, CompleteOrderModal, TrashIcon, WrenchIcon, NoteIcon } from "../components.jsx";
+import { Badge, Btn, IBtn, Modal, ModalTitle, Sel, Inp, StatCard, PageHeader, Spinner, TicketTag, SearchInput, ColorDot, CarLine, CheckIcon, XIcon, FlagIcon, ClockIcon, BayIcon, RefreshIcon, PlusIcon, ConfirmModal, CompleteOrderModal, TrashIcon, WrenchIcon, NoteIcon } from "../components.jsx";
 
 // A car is "Live at Bay" once a mechanic presses Start, and "Done" once they
 // press Finished (until the front desk completes it with a price).
@@ -96,6 +97,7 @@ function LiveCard({ b, onFinish, onSnooze, onExtend }) {
       <div style={{ fontSize:14, fontWeight:700, color:T.textPrimary, marginBottom:2, overflowWrap:"anywhere", display:"flex", flexWrap:"wrap", alignItems:"center", gap:6 }}><TicketTag n={b.ticketNumber}/><span style={{ minWidth:0 }}>{b.firstName} {b.lastName}</span></div>
       <div style={{ fontSize:11, fontWeight:600, color:accentColor, textTransform:"uppercase", letterSpacing:"0.04em", marginBottom:8, overflowWrap:"anywhere" }}>{displaySvc(b)}</div>
       {b._elapsedMinutes != null && <div style={{ fontSize:11, color:T.textMuted, marginBottom:8 }}>In shop {b._elapsedMinutes} min</div>}
+      {(b.carMakeModel || b.carColor) && <div style={{ marginBottom:8 }}><CarLine b={b} big colorHexFn={colorHex}/></div>}
 
       {b.tireSize && (
         <div style={{ display:"flex", alignItems:"center", gap:5, fontSize:11, color:T.textMuted, marginBottom:8 }}>
@@ -174,6 +176,7 @@ function QueueRow({ b, isNext, onConfirm, onCancel, onComplete, onStart, onFinis
             {isNext && <span style={{ fontSize:9, fontWeight:800, letterSpacing:"0.06em", textTransform:"uppercase", padding:"2px 7px", borderRadius:20, background:T.green, color:"#fff", whiteSpace:"nowrap" }}>Next up</span>}
           </div>
           <div style={{ fontSize:11, fontWeight:600, color:s.color, textTransform:"uppercase", letterSpacing:"0.04em", marginBottom:(b.tireSize||b.tireQuantity)?3:0, overflowWrap:"anywhere" }}>{displaySvc(b)}</div>
+          <CarLine b={b} colorHexFn={colorHex}/>
           {(b.tireSize || b.tireQuantity) && (
             <div style={{ fontSize:14, fontWeight:700, color:T.textSecond, display:"flex", alignItems:"center", gap:5 }}>
               <TireIcon size={13} color={T.orange}/>
@@ -281,6 +284,7 @@ function WalkInModal({ onClose, onSave, services }) {
     firstName:"", lastName:"", phone:"", email:"",
     service:svcList[0], date:todayIso, time:"",
     tireSize:"", tireQuantity:"", price:"", status:"confirmed",
+    carMakeModel:"", carColor:"",
     termsAgreed:false,
   });
   const [slots,        setSlots]        = useState([]);
@@ -348,6 +352,15 @@ function WalkInModal({ onClose, onSave, services }) {
         <div><Lbl>Last name *</Lbl><Inp value={form.lastName} onChange={e=>sf("lastName",e.target.value)} placeholder="Smith"/></div>
         <div><Lbl>Phone *</Lbl><Inp type="tel" value={form.phone} onChange={e=>sf("phone",e.target.value)} placeholder="+1 (416) 555-0000"/></div>
         <div><Lbl>Email</Lbl><Inp type="email" value={form.email} onChange={e=>sf("email",e.target.value)} placeholder="optional"/></div>
+      </div>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,240px),1fr))", gap:12, marginBottom:12 }}>
+        <div><Lbl>Car make &amp; model</Lbl>
+          <SearchInput value={form.carMakeModel} onChange={v=>sf("carMakeModel",v)} placeholder="Start typing, e.g. Toyota Camry"
+            search={q=>searchOptions(CAR_OPTIONS,q)}/></div>
+        <div><Lbl>Car color</Lbl>
+          <SearchInput value={form.carColor} onChange={v=>sf("carColor",v)} placeholder="Start typing, e.g. Grey"
+            search={q=>searchOptions(CAR_COLORS,q)} renderIcon={c=><ColorDot hex={c.hex}/>}
+            leading={form.carColor ? <ColorDot hex={colorHex(form.carColor)}/> : null}/></div>
       </div>
       <div style={{ marginBottom:12 }}>
         <Lbl>Service</Lbl>
@@ -564,7 +577,9 @@ export default function TodayPage({ onAlert }) {
           services={services}
           onClose={() => setShowWalkIn(false)}
           onSave={async (form) => {
-            const { price, tireQuantity, ...rest } = form;
+            // Car details are saved in a second, staff-only step (like the price) so the
+            // public /book endpoint stays exactly as it is.
+            const { price, tireQuantity, carMakeModel, carColor, ...rest } = form;
             const body = { ...rest };
             if (tireQuantity !== "" && tireQuantity != null) body.tireQuantity = parseInt(tireQuantity, 10);
             const res = await createWalkIn(body);
@@ -575,6 +590,11 @@ export default function TodayPage({ onAlert }) {
               const p = parseFloat(price);
               try { await updatePayment(res.booking.id, { quotedPrice: p, finalPrice: p, paymentStatus: "unpaid" }); }
               catch (e) { onAlert?.("Booking made, but price didn't save: " + e.message, "error"); }
+            }
+            const car = { carMakeModel: (carMakeModel || "").trim(), carColor: (carColor || "").trim() };
+            if ((car.carMakeModel || car.carColor) && res?.booking?.id) {
+              try { await updateBooking(res.booking.id, car); }
+              catch (e) { onAlert?.("Booking made, but car details didn't save: " + e.message, "error"); }
             }
             onAlert?.("Walk-in booking created");
             setShowWalkIn(false);

@@ -1,8 +1,9 @@
 // pages/BookingsPage.jsx
 import { useState, useEffect, useCallback } from "react";
 import { fetchBookings, fetchRecentlyDeleted, updateBooking, deleteBooking, restoreBooking, sendSMS, updatePayment, getUserRole } from "../api.js";
+import { CAR_OPTIONS, CAR_COLORS, colorHex, searchOptions } from "../vehicles.js";
 import { getT, getTheme, sm, displaySvc, effectiveOcc, fmtDate, todayStr, formatTireSize, money, fmtBooked } from "../theme.js";
-import { Badge, TicketTag, Btn, IBtn, Modal, ModalTitle, Inp, Sel, PageHeader, Spinner, Empty, Card, CompleteOrderModal, SearchIcon, RefreshIcon, CheckIcon, XIcon, FlagIcon, MsgIcon, TrashIcon, PenIcon, NoteIcon, RestoreIcon, PlusIcon, DownloadIcon, ClipboardCheckIcon } from "../components.jsx";
+import { Badge, TicketTag, SearchInput, ColorDot, CarLine, Btn, IBtn, Modal, ModalTitle, Inp, Sel, PageHeader, Spinner, Empty, Card, CompleteOrderModal, SearchIcon, RefreshIcon, CheckIcon, XIcon, FlagIcon, MsgIcon, TrashIcon, PenIcon, NoteIcon, RestoreIcon, PlusIcon, DownloadIcon, ClipboardCheckIcon } from "../components.jsx";
 import InspectionModal from "../InspectionReport.jsx";
 
 
@@ -64,6 +65,7 @@ function BookingRow({ b, onUpdate, onDelete, onSMS, onEdit, onPayment, onAlert, 
         <div style={{ fontSize:13, fontWeight:700, color:T.textPrimary, display:"flex", flexWrap:"wrap", alignItems:"center", gap:6 }}><TicketTag n={b.ticketNumber}/><span style={{ minWidth:0 }}>{b.firstName} {b.lastName}</span></div>
         <div style={{ fontSize:11, color:T.textMuted, display:"flex", flexWrap:"wrap", columnGap:8 }}><span style={{ whiteSpace:"nowrap" }}>{b.phone}</span>{b.email && <span style={{ minWidth:0 }}>{b.email}</span>}{b.createdAt && <span style={{ whiteSpace:"nowrap" }}>Booked {fmtBooked(b.createdAt)}</span>}</div>
         <div style={{ fontSize:11, fontWeight:600, color:s.color, textTransform:"uppercase", letterSpacing:"0.04em", marginTop:2 }}>{displaySvc(b)}</div>
+        <CarLine b={b} colorHexFn={colorHex}/>
         {b.tireSize && <div style={{ fontSize:10, color:T.orange, marginTop:1 }}>{b.tireSize}</div>}
         {b.mechanicNotes && <div style={{ fontSize:11, color:T.textMuted, marginTop:3, display:"flex", alignItems:"flex-start", gap:4 }}><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0,marginTop:1}}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>{b.mechanicNotes}</div>}
         {b.notes && <div style={{ fontSize:11, color:T.textMuted, marginTop:2 }}>{b.notes}</div>}
@@ -364,6 +366,7 @@ function EditModal({ booking: b, onClose, onSave }) {
     firstName:b.firstName||"", lastName:b.lastName||"", phone:b.phone||"", email:b.email||"",
     status:b.status, date:b.date, time:b.time, notes:b.notes||"",
     tireSize:b.tireSize||"", tireQuantity:b.tireQuantity ?? "",
+    carMakeModel:b.carMakeModel||"", carColor:b.carColor||"",
     price:b.finalPrice ?? "", paymentMethod:b.paymentMethod || "",
   });
   const [busy, setBusy] = useState(false);
@@ -384,6 +387,13 @@ function EditModal({ booking: b, onClose, onSave }) {
         <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr", gap:10, alignItems:"end" }}>
           <div><Lbl>Tire size</Lbl><Inp value={form.tireSize} onChange={e=>set("tireSize",formatTireSize(e.target.value, e.target.selectionStart === e.target.value.length))} placeholder="225/65R17" style={{ fontSize:16, fontWeight:600, letterSpacing:"0.02em" }}/></div>
           <div><Lbl>How many tires</Lbl><Inp type="number" value={form.tireQuantity} onChange={e=>set("tireQuantity",e.target.value)} placeholder="e.g. 4"/></div>
+        </div>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(150px, 1fr))", gap:10, alignItems:"end" }}>
+          <div style={{ minWidth:0 }}><Lbl>Car make &amp; model</Lbl>
+            <SearchInput value={form.carMakeModel} onChange={v=>set("carMakeModel",v)} placeholder="e.g. Toyota Camry" search={q=>searchOptions(CAR_OPTIONS,q)}/></div>
+          <div style={{ minWidth:0 }}><Lbl>Car color</Lbl>
+            <SearchInput value={form.carColor} onChange={v=>set("carColor",v)} placeholder="e.g. Grey" search={q=>searchOptions(CAR_COLORS,q)}
+              renderIcon={c=><ColorDot hex={c.hex}/>} leading={form.carColor ? <ColorDot hex={colorHex(form.carColor)}/> : null}/></div>
         </div>
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, alignItems:"end" }}>
           <div><Lbl>Price ($)</Lbl><Inp type="number" value={form.price} onChange={e=>set("price",e.target.value)} placeholder="0.00"/></div>

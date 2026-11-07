@@ -98,6 +98,76 @@ export function Inp({ value, onChange, placeholder, type = "text", disabled = fa
   );
 }
 
+// ── Search box with suggestions ──────────────────────────────────────────────
+// Shows nothing until you type; then only the options that match (via `search`).
+// Arrow keys + Enter or tap to pick. Free text is always allowed.
+// `renderIcon(option)` can draw something before each suggestion (e.g. a color dot).
+export function SearchInput({ value, onChange, placeholder, search, renderIcon, leading }) {
+  const T = getT();
+  const [open, setOpen] = useState(false);
+  const [hi, setHi] = useState(0);
+  const [f, setF] = useState(false);
+  const blurT = useRef(null);
+  const results = open ? search(value) : [];
+  const label = o => typeof o === "string" ? o : o.name;
+  // Hide the list when the typed text already equals the only match.
+  const show = results.length > 0 && !(results.length === 1 && label(results[0]).toLowerCase() === String(value || "").trim().toLowerCase());
+  const pick = o => { onChange(label(o)); setOpen(false); };
+  const onKey = e => {
+    if (!show) return;
+    if (e.key === "ArrowDown") { e.preventDefault(); setHi(h => Math.min(h + 1, results.length - 1)); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setHi(h => Math.max(h - 1, 0)); }
+    else if (e.key === "Enter") { e.preventDefault(); pick(results[hi] || results[0]); }
+    else if (e.key === "Escape") { setOpen(false); }
+  };
+  useEffect(() => () => clearTimeout(blurT.current), []);
+  return (
+    <div style={{ position:"relative" }}>
+      {leading && <span style={{ position:"absolute", left:11, top:"50%", transform:"translateY(-50%)", display:"flex", pointerEvents:"none" }}>{leading}</span>}
+      <input value={value || ""} placeholder={placeholder} autoComplete="off" autoCorrect="off" spellCheck={false}
+        onChange={e => { onChange(e.target.value); setOpen(true); setHi(0); }}
+        onFocus={() => { setF(true); clearTimeout(blurT.current); }}
+        onBlur={() => { setF(false); blurT.current = setTimeout(() => setOpen(false), 150); }}
+        onKeyDown={onKey}
+        style={{ width:"100%", background:T.pageBg, border:`1.5px solid ${f?T.blue:T.border}`, borderRadius:T.r8, padding:leading ? "9px 12px 9px 32px" : "9px 12px", minHeight:38, color:T.textPrimary, fontSize:16, fontFamily:T.font, outline:"none", boxSizing:"border-box", transition:"border-color .13s" }}/>
+      {show && (
+        <div role="listbox" style={{ position:"absolute", left:0, right:0, top:"calc(100% + 4px)", zIndex:50, background:T.cardBg, border:`1px solid ${T.border}`, borderRadius:T.r8, boxShadow:"0 10px 30px rgba(0,0,0,.35)", overflow:"hidden", maxHeight:280, overflowY:"auto" }}>
+          {results.map((o, i) => (
+            <div key={label(o)} role="option" aria-selected={i === hi}
+              onMouseDown={e => { e.preventDefault(); pick(o); }}
+              onMouseEnter={() => setHi(i)}
+              style={{ display:"flex", alignItems:"center", gap:9, padding:"10px 12px", minHeight:40, boxSizing:"border-box", fontSize:14, color:T.textPrimary, cursor:"pointer", background:i === hi ? T.elevated : "transparent", borderTop:i ? `1px solid ${T.border}` : "none" }}>
+              {renderIcon && renderIcon(o)}
+              <span>{label(o)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Small round swatch for a car color (falls back to an outlined circle for unknown colors).
+export function ColorDot({ hex, size = 12 }) {
+  const T = getT();
+  return <span style={{ width:size, height:size, borderRadius:"50%", flexShrink:0, background:hex || "transparent", border:`1px solid ${hex ? "rgba(128,128,128,.55)" : T.textMuted}`, display:"inline-block" }}/>;
+}
+
+// "Toyota Camry · Grey" line with a car icon and color swatch, for mechanics.
+export function CarLine({ b, big = false, colorHexFn }) {
+  const T = getT();
+  if (!b?.carMakeModel && !b?.carColor) return null;
+  const hex = colorHexFn ? colorHexFn(b.carColor) : null;
+  return (
+    <div style={{ display:"flex", alignItems:"center", flexWrap:"wrap", gap:6, fontSize:big ? 14 : 12, fontWeight:700, color:T.textSecond, marginTop:2 }}>
+      <svg width={big ? 14 : 12} height={big ? 14 : 12} viewBox="0 0 24 24" fill="none" stroke={T.blue} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink:0 }}><path d="M5 17H3v-5l2-5h14l2 5v5h-2"/><circle cx="7.5" cy="17" r="2"/><circle cx="16.5" cy="17" r="2"/><path d="M9.5 17h5M3 12h18"/></svg>
+      {b.carMakeModel && <span style={{ overflowWrap:"anywhere" }}>{b.carMakeModel}</span>}
+      {b.carMakeModel && b.carColor && <span style={{ color:T.textMuted, fontWeight:400 }}>·</span>}
+      {b.carColor && <span style={{ display:"inline-flex", alignItems:"center", gap:5 }}><ColorDot hex={hex} size={big ? 12 : 10}/>{b.carColor}</span>}
+    </div>
+  );
+}
+
 export function Sel({ value, onChange, options, style = {} }) {
   const T = getT(); const [f, setF] = useState(false);
   return (

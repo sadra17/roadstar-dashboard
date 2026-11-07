@@ -4,8 +4,9 @@
 // order to the front desk/owner to complete (with a price) — it does not auto-complete.
 import { useState, useEffect, useCallback } from "react";
 import { fetchLiveBay, baySnooze, extendBay, updateMechanic, bayStart, bayEnd, getToken, getUserRole } from "../api.js";
+import { colorHex } from "../vehicles.js";
 import { getT, displaySvc, effectiveOcc, byTime } from "../theme.js";
-import { Badge, TicketTag, Btn, IBtn, Modal, ModalTitle, PageHeader, Spinner, Empty, Card, RefreshIcon, BayIcon, FlagIcon, ClockIcon, CheckIcon, PlusIcon, WrenchIcon, NoteIcon } from "../components.jsx";
+import { Badge, TicketTag, CarLine, Btn, IBtn, Modal, ModalTitle, PageHeader, Spinner, Empty, Card, RefreshIcon, BayIcon, FlagIcon, ClockIcon, CheckIcon, PlusIcon, WrenchIcon, NoteIcon } from "../components.jsx";
 
 export default function LiveBayPage({ onAlert }) {
   const T = getT();
@@ -73,6 +74,7 @@ export default function LiveBayPage({ onAlert }) {
   // mechanic can read everything the front desk / customer left.
   const CustomerInfo = (b) => (
     <>
+      {(b.carMakeModel || b.carColor) && <div style={{ marginBottom:7 }}><CarLine b={b} big colorHexFn={colorHex}/></div>}
       {b.tireSize && <div style={{ fontSize:16, fontWeight:700, color:T.orange, marginBottom:7, display:"flex", alignItems:"center", gap:6, letterSpacing:"0.02em" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/><path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4"/></svg>{b.tireSize}{b.tireQuantity ? ` · ${b.tireQuantity} tires` : ""}</div>}
       {!b.tireSize && b.doesntKnowTireSize && <div style={{ fontSize:13, fontWeight:600, color:T.textMuted, marginBottom:7 }}>Tire size: doesn't know{b.tireQuantity ? ` · ${b.tireQuantity} tires` : ""}</div>}
       {!b.tireSize && !b.doesntKnowTireSize && b.tireQuantity ? <div style={{ fontSize:13, fontWeight:600, color:T.textMuted, marginBottom:7 }}>{b.tireQuantity} tires</div> : null}
@@ -189,6 +191,7 @@ export default function LiveBayPage({ onAlert }) {
                       <div style={{ flex:"1 1 160px", minWidth:0, overflowWrap:"anywhere" }}>
                         <div style={{ fontSize:13, fontWeight:600, color:T.textPrimary, display:"flex", flexWrap:"wrap", alignItems:"center", gap:6 }}><TicketTag n={b.ticketNumber}/><span style={{ minWidth:0 }}>{b.firstName} {b.lastName}</span></div>
                         <div style={{ fontSize:11, color:T.textMuted }}>{displaySvc(b)} · {effectiveOcc(b)} min</div>
+                        <CarLine b={b} colorHexFn={colorHex}/>
                       </div>
                       <span style={{ flexShrink:0, display:"flex" }}><Badge status={b.status}/></span>
                     </div>
