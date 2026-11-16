@@ -1,5 +1,5 @@
 // pages/BookingsPage.jsx
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { fetchBookings, fetchRecentlyDeleted, updateBooking, deleteBooking, restoreBooking, sendSMS, updatePayment, getUserRole } from "../api.js";
 import { CAR_OPTIONS, CAR_COLORS, colorHex, searchOptions } from "../vehicles.js";
 import { getT, getTheme, sm, displaySvc, effectiveOcc, fmtDate, todayStr, formatTireSize, money, fmtBooked } from "../theme.js";
@@ -43,6 +43,26 @@ const byDateTime = (a, b) => (a.date || "").localeCompare(b.date || "") || timeT
 
 // Statuses that are final — they leave the Live Queue and live in the "Cancelled / No-show" tab.
 const CLOSED = ["cancelled","no_show"];
+const OPEN   = ["pending","confirmed","waitlist"];
+
+// How much history the page loads. The whole history is never fetched at once (it
+// grows every day and was being re-downloaded on every refresh):
+//   Live Queue                 last 7 days onward, plus any still-open older booking
+//   Completed / Cancelled tabs last 60 days, "Load older" adds 90 days at a time
+//   Search box                 asks the server across ALL dates
+const LIVE_DAYS = 7, CLOSED_DAYS = 60, OLDER_STEP = 90;
+const SHOP_TZ = "America/Toronto";
+// The shop's calendar date (not the device's), n days from today, as YYYY-MM-DD
+function shopYmd(offsetDays = 0) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: SHOP_TZ, year: "numeric", month: "2-digit", day: "2-digit" })
+    .formatToParts(new Date()).map(x => [x.type, x.value]));
+  return addDays(`${parts.year}-${parts.month}-${parts.day}`, offsetDays);
+}
+function addDays(ymd, n) {
+  const d = new Date(`${ymd}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+const fmtYmd = (ymd) => new Date(`${ymd}T12:00:00Z`).toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" });
 
 // Readable error text. Validation (422) responses carry only errors[] with no top-level
 // message, so the thrown text is just "API error 422" — explain it instead.
@@ -108,16 +128,60 @@ export default function BookingsPage({ onAlert }) {
   const [smsB,       setSmsB]      = useState(null);
   const [inspectB,   setInspectB]  = useState(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  // What's on screen: appointments from `from` onward, plus still-open older ones
+  // (overdue — they stay in the Live Queue), plus server search hits from every date
+  // while something is typed in the search box.
+  const [from,       setFrom]      = useState(() => shopYmd(-LIVE_DAYS));
+  const [searchBusy, setSearchBusy]= useState(false);
+  const loadSeq = useRef(0);
+  const qRef    = useRef(""); // search text last sent to the server ("" = none)
+
+  // silent = background refresh (no spinner, no error toast)
+  const load = useCallback(async (silent = false) => {
+    const seq = ++loadSeq.current;
+    if (silent !== true) setLoading(true);
     try {
-      const f = {}; if (dateFilter) f.date = dateFilter; if (status !== "all") f.status = status;
-      const [bk, del] = await Promise.all([fetchBookings(f), fetchRecentlyDeleted()]);
-      setBookings(bk || []); setDeleted(del || []);
-    } catch (e) { onAlert?.(e.message, "error"); } finally { setLoading(false); }
-  }, [dateFilter, status]);
+      const st = status !== "all" ? { status } : {};
+      const q  = qRef.current;
+      const reqs = [];
+      if (dateFilter) reqs.push(fetchBookings({ ...st, date: dateFilter }));
+      else {
+        reqs.push(fetchBookings(from ? { ...st, from } : st));
+        const openSt = status === "all" ? OPEN : OPEN.includes(status) ? [status] : [];
+        if (from && openSt.length) reqs.push(fetchBookings({ status: openSt.join(","), to: addDays(from, -1) }));
+        if (q) reqs.push(fetchBookings({ ...st, q }));
+      }
+      const [del, ...lists] = await Promise.all([fetchRecentlyDeleted(), ...reqs]);
+      if (seq !== loadSeq.current) return; // a newer load has started — its answer wins
+      const byId = new Map();
+      for (const list of lists) for (const b of (list || [])) byId.set(b.id, b);
+      setBookings([...byId.values()]); setDeleted(del || []);
+    } catch (e) { if (silent !== true && seq === loadSeq.current) onAlert?.(e.message, "error"); }
+    finally { if (seq === loadSeq.current) setLoading(false); }
+  }, [dateFilter, status, from]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Search box: what's already loaded filters instantly (below); after a short pause in
+  // typing the server is also asked for matches from every date.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const q = search.trim();
+      const want = q.length >= 2 ? q : "";
+      if (want === qRef.current) return;
+      qRef.current = want;
+      setSearchBusy(!!want);
+      load(true).finally(() => setSearchBusy(false));
+    }, 350);
+    return () => clearTimeout(t);
+  }, [search, load]);
+
+  // Completed / Cancelled tabs show the last 60 days (the Live Queue only needs 7)
+  const openTab = (id) => {
+    setTab(id);
+    const closedFrom = shopYmd(-CLOSED_DAYS);
+    if ((id === "completed" || id === "cancelled") && from && from > closedFrom) setFrom(closedFrom);
+  };
 
   const handleUpdate = async (id, updates) => {
     const u = await updateBooking(id, updates);
@@ -161,15 +225,15 @@ export default function BookingsPage({ onAlert }) {
   // Picking a status in the filter jumps to the tab that actually lists it
   const pickStatus = (v) => {
     setStatus(v);
-    if (v === "completed") setTab("completed");
-    else if (CLOSED.includes(v)) setTab("cancelled");
+    if (v === "completed") openTab("completed");
+    else if (CLOSED.includes(v)) openTab("cancelled");
     else if (v !== "all" && tab !== "deleted") setTab("active");
   };
   const dateScheme = getTheme() === "light" ? "light" : "dark";
 
   return (
     <div>
-      <PageHeader title="Bookings" sub="All appointments across all dates"
+      <PageHeader title="Bookings" sub="Live queue and recent history. Search covers all dates."
         actions={
           <>
             <Btn small variant="ghost" icon={<RefreshIcon size={13}/>} onClick={load}>Refresh</Btn>
@@ -198,13 +262,25 @@ export default function BookingsPage({ onAlert }) {
       {/* Tabs — mechanics only see active/completed, not deleted */}
       <div style={{ display:"flex", gap:2, background:T.cardBg, border:`1px solid ${T.border}`, borderRadius:T.r10, padding:4, marginBottom:16, width:"fit-content", maxWidth:"100%", flexWrap:"wrap", boxSizing:"border-box" }}>
         {[["active","Live Queue",active.length],["completed","Completed",completed.length],["cancelled","Cancelled / No-show",cancelled.length],...(isMechanic?[]:[ ["deleted","Recently Deleted",deleted.length] ])].map(([id,label,count]) => (
-          <button key={id} onClick={()=>setTab(id)}
+          <button key={id} onClick={()=>openTab(id)}
             style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 14px", borderRadius:T.r8, border:"none", background:tab===id?T.elevated:"transparent", color:tab===id?T.textPrimary:T.textMuted, fontSize:13, fontWeight:tab===id?600:400, fontFamily:T.font, cursor:"pointer", whiteSpace:"nowrap" }}>
             {label}
             {count > 0 && <span style={{ fontSize:10, background:tab===id?T.blue:T.border, color:tab===id?"#fff":T.textMuted, padding:"1px 6px", borderRadius:20 }}>{count}</span>}
           </button>
         ))}
       </div>
+
+      {/* What range is loaded, and how to reach older appointments */}
+      {tab !== "deleted" && !dateFilter && (from || searchBusy || search.trim().length >= 2) && (
+        <div style={{ display:"flex", flexWrap:"wrap", alignItems:"center", gap:"6px 10px", margin:"-6px 0 14px", fontSize:12, color:T.textMuted }}>
+          {search.trim().length >= 2
+            ? <span>{searchBusy ? "Searching all dates…" : "Search results include all dates."}</span>
+            : <span>Showing appointments from {fmtYmd(from)} onward{tab === "active" ? ", plus any older ones still open" : ""}. Search by name or phone, or pick a date, to find older ones.</span>}
+          {from && tab !== "active" && search.trim().length < 2 && (
+            <Btn small variant="ghost" onClick={() => setFrom(f => f ? addDays(f, -OLDER_STEP) : f)}>Load older</Btn>
+          )}
+        </div>
+      )}
 
       {loading ? <Spinner/> : shown.length === 0 ? (
         <Empty icon={null} title="No bookings" sub={tab==="deleted" ? "No recently deleted bookings" : "No bookings match your filters"}/>
