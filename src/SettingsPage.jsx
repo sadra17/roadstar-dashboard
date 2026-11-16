@@ -351,6 +351,7 @@ function CapacitySection({s, set}) {
 function SMSSection({s, set}) {
   const T = getT();
   const TMPL = [
+    {key:"received",            label:"Request sent (website booking)", hint:"Sent right away when a website booking comes in as pending — before staff confirm it"},
     {key:"confirmed",           label:"Appointment confirmed",         hint:"Sent when staff confirms"},
     {key:"declined",            label:"Declined / cancelled",          hint:"Sent when staff cancels"},
     {key:"waitlist",            label:"Waitlist spot opened",          hint:"Sent when a slot opens"},
